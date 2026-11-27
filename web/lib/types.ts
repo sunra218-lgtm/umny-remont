@@ -238,3 +238,35 @@ export type Inspection = {
   signed_at: string | null;
   created_at: string;
 };
+
+export type Payment = {
+  id: string;
+  stage_id: string | null;
+  object_id: string;
+  act_id: string | null;
+  status: "created" | "pending_funding" | "held" | "release_requested" | "released" | "frozen" | "refunded" | "failed";
+  amount_kop: number;
+  breakdown: { work_kop?: number; material_kop?: number; platform_fee_kop?: number };
+  recipients: { role: string; inn: string; amount_kop: number }[];
+  pay_url: string | null;
+  expires_at: string | null;
+  created_at: string;
+  stage_title: string | null;
+  address: string | null;
+};
+
+export type Act = {
+  id: string;
+  stage_id: string;
+  number: string;
+  work_kop: number;
+  material_kop: number;
+  status: "draft" | "sent" | "signed_contractor" | "signed_customer" | "released" | "rejected";
+  reject_reason: string | null;
+  created_at: string;
+  contractor_signed_at: string | null;
+  customer_signed_at: string | null;
+  payment_status: Payment["status"] | null;
+  can_sign: boolean;
+  can_reject: boolean;
+};

@@ -195,41 +195,6 @@ def _change_stage(
     )
 
 
-@router.post(
-    "/stages/{stage_id}/mark-funded",
-    response_model=StageOut,
-    summary="Отметить резерв этапа (временно, до подключения банка)",
-)
-async def mark_funded(
-    stage_id: uuid.UUID, current: Auth, request: Request, db: DbSession
-) -> StageOut:
-    """Заменяет вебхук банка о резерве до спринта 5: этап становится «готов к работе»."""
-    stage, access = await _stage(db, current, stage_id, lock=True)
-    if not access.is_admin:
-        raise Problem(403, "forbidden", "Резерв подтверждает администратор платформы")
-    obj = await db.get(RepairObject, stage.object_id, with_for_update=True)
-    assert obj is not None
-    if obj.status not in (ObjectStatus.contracting, ObjectStatus.active):
-        raise Problem(409, "object-not-contracted", "Сначала заказчик утверждает полную смету")
-    if stage.status == StageStatus.planned:
-        _change_stage(db, request, current, stage, StageStatus.funding, "stage.funding")
-    _change_stage(db, request, current, stage, StageStatus.ready, "stage.funded", manual=True)
-    if obj.status == ObjectStatus.contracting:
-        ensure_transition("object", obj.status, ObjectStatus.active)
-        obj.status = ObjectStatus.active
-        audit(
-            db,
-            entity_type="object",
-            entity_id=obj.id,
-            action="object.activated",
-            actor_id=current.id,
-            ip=client_ip(request),
-            new={"status": ObjectStatus.active},
-        )
-    await db.commit()
-    return _stage_out(stage)
-
-
 @router.post("/stages/{stage_id}/start", response_model=StageOut, summary="Начать работы на этапе")
 async def start_stage(
     stage_id: uuid.UUID, current: Auth, request: Request, db: DbSession

@@ -9,6 +9,7 @@ from app.core.db import get_engine
 from app.core.idempotency import IdempotencyMiddleware
 from app.core.problems import install_problem_handlers
 from app.core.redis import get_redis
+from app.modules.acts.router import router as acts_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.links import router as links_router
 from app.modules.auth.router import router as auth_router
@@ -20,6 +21,7 @@ from app.modules.inspections.router import router as inspections_router
 from app.modules.me.router import router as me_router
 from app.modules.objects.router import router as objects_router
 from app.modules.orgs.router import router as orgs_router
+from app.modules.payments.router import router as payments_router
 from app.modules.services.router import router as services_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -59,6 +61,8 @@ def create_app() -> FastAPI:
     api.include_router(field_router)
     api.include_router(checklists_router)
     api.include_router(inspections_router)
+    api.include_router(payments_router)
+    api.include_router(acts_router)
 
     @api.get("/health", tags=["system"], summary="Проверка работоспособности")
     async def health() -> dict[str, str]:

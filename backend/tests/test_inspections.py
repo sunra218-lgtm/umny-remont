@@ -1,10 +1,9 @@
 """Спринт 4: чек-листы, ход этапа, выезд технадзора и проверка фото."""
 
 from httpx import AsyncClient
-from sqlalchemy import text
 
 from tests.conftest import idem
-from tests.scenario import build_world, post
+from tests.scenario import build_world, fund_stage, post
 from tests.test_field import foreman_on_phone, media_dir, photo, upload  # noqa: F401
 
 TEMPLATE = {
@@ -64,16 +63,9 @@ async def test_stage_flow_with_stop_point(
     sid = stage["id"]
     lite, device, _ = await foreman_on_phone(client, w)
 
-    # Без резерва работать нельзя, резерв — только после утверждения сметы.
+    # Без резерва работать нельзя.
     assert (await post(client, f"/api/v1/stages/{sid}/start", lite)).status_code == 409
-    assert (await post(client, f"/api/v1/stages/{sid}/mark-funded", w.boss)).status_code == 403
-    assert (await post(client, f"/api/v1/stages/{sid}/mark-funded", admin)).status_code == 409
-    async with engine.begin() as conn:
-        await conn.execute(
-            text("UPDATE objects SET status = 'contracting' WHERE id = :id"), {"id": w.object_id}
-        )
-    funded = await post(client, f"/api/v1/stages/{sid}/mark-funded", admin)
-    assert funded.json()["status"] == "ready"
+    await fund_stage(client, engine, w, sid)
     obj = (await client.get(f"/api/v1/objects/{w.object_id}", headers=w.customer)).json()
     assert obj["status"] == "active"
     assert (await post(client, f"/api/v1/stages/{sid}/start", w.customer)).status_code == 403
@@ -170,12 +162,8 @@ async def test_stage_without_stop_point(
             client, f"/api/v1/objects/{w.object_id}/stages", w.estimator, {"title": "Стяжка"}
         )
     ).json()
-    async with engine.begin() as conn:
-        await conn.execute(
-            text("UPDATE objects SET status = 'active' WHERE id = :id"), {"id": w.object_id}
-        )
     sid = stage["id"]
-    await post(client, f"/api/v1/stages/{sid}/mark-funded", admin)
+    await fund_stage(client, engine, w, sid)
     await post(client, f"/api/v1/stages/{sid}/start", w.boss)
     out = (await post(client, f"/api/v1/stages/{sid}/submit", w.boss)).json()
     assert out == {**out, "missing": []}

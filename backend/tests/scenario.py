@@ -90,3 +90,33 @@ async def build_world(
         object_id=object_id,
         user_ids=user_ids,
     )
+
+
+async def fund_stage(  # type: ignore[no-untyped-def]
+    client: AsyncClient,
+    engine,
+    w: World,
+    stage_id: str,
+    *,
+    work_kop: int = 3_000_000,
+    material_kop: int = 1_000_000,
+) -> dict:  # type: ignore[type-arg]
+    """Смета утверждена (статус и бюджет ставим напрямую), заказчик резервирует и «оплачивает»."""
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE objects SET status = 'contracting' WHERE id = :id AND status = 'draft'"),
+            {"id": w.object_id},
+        )
+        await conn.execute(
+            text("UPDATE stages SET work_budget_kop = :w, material_budget_kop = :m WHERE id = :id"),
+            {"w": work_kop, "m": material_kop, "id": stage_id},
+        )
+    hold = await post(client, f"/api/v1/stages/{stage_id}/payments/hold", w.customer)
+    assert hold.status_code == 201, hold.text
+    paid = await post(
+        client, f"/api/v1/fake-bank/payments/{hold.json()['id']}/pay", w.customer, {"success": True}
+    )
+    assert paid.json()["status"] == "held", paid.text
+    return paid.json()
