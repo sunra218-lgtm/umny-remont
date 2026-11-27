@@ -816,3 +816,28 @@ audio {
   max-width: 100%;
   margin-top: 4px;
 }
+.kpi {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: calc(var(--space) * 2);
+}
+.kpi li {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: calc(var(--space) * 2);
+}
+.kpi li.kpi-ok {
+  border-color: var(--accent);
+}
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.kpi-value .muted {
+  font-size: 16px;
+  font-weight: 400;
+}

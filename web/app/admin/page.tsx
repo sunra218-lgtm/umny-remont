@@ -5,16 +5,16 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import { DISPUTE_OUTCOME_LABELS, DISPUTE_STATUS_LABELS, formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
-import type { AdminUser, Dispute, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
+import { OBJECT_STATUS_LABELS, DISPUTE_OUTCOME_LABELS, DISPUTE_STATUS_LABELS, formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
+import type { AdminUser, Dispute, Kpi, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
-type Tab = "orgs" | "disputes" | "catalog" | "checklists" | "users" | "audit";
+type Tab = "pilot" | "orgs" | "disputes" | "catalog" | "checklists" | "users" | "audit";
 
 export default function AdminPage() {
   const { me, loading } = useRequireAuth({ admin: true });
-  const [tab, setTab] = useState<Tab>("orgs");
+  const [tab, setTab] = useState<Tab>("pilot");
   if (loading || !me?.is_platform_admin) return <Shell><Loading /></Shell>;
   return (
     <Shell wide>
@@ -22,6 +22,7 @@ export default function AdminPage() {
       <div className="tabs" role="tablist">
         {(
           [
+            ["pilot", "Пилот"],
             ["orgs", "Организации"],
             ["disputes", "Споры"],
             ["catalog", "Справочник расценок"],
@@ -35,6 +36,7 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+      {tab === "pilot" && <PilotTab />}
       {tab === "orgs" && <OrgsTab />}
       {tab === "disputes" && <DisputesTab />}
       {tab === "catalog" && <CatalogTab />}
@@ -778,5 +780,76 @@ function DisputesTab() {
         </ul>
       )}
     </section>
+  );
+}
+
+function PilotTab() {
+  const [kpi, setKpi] = useState<Kpi | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api<Kpi>("/admin/kpi")
+      .then(setKpi)
+      .catch((err) => setError(errorText(err)));
+  }, []);
+  if (error) return <ErrorNote text={error} />;
+  if (!kpi) return <Loading />;
+  return (
+    <>
+      <section className="card">
+        <h2>Цели Gate 1</h2>
+        <ul className="kpi">
+          {kpi.metrics.map((m) => (
+            <li key={m.key} className={m.ok ? "kpi-ok" : undefined}>
+              <div className="kpi-value">
+                {m.value.toLocaleString("ru-RU")}
+                <span className="muted"> / {m.target.toLocaleString("ru-RU")} {m.unit}</span>
+              </div>
+              <div>
+                <b>{m.title}</b> {m.ok ? <span className="status status-approved">выполнено</span> : null}
+              </div>
+              {m.note && <div className="muted small">{m.note}</div>}
+            </li>
+          ))}
+        </ul>
+        <p className="muted small">Обновлено {formatDate(kpi.generated_at)}</p>
+      </section>
+      <section className="card">
+        <h2>Фотоотчёты по объектам</h2>
+        {kpi.objects.length === 0 ? (
+          <p className="muted">Объектов в пилоте пока нет. Объект попадает сюда после резерва денег на первый этап.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Объект</th>
+                  <th>Подрядчик</th>
+                  <th>Дней с отчётом</th>
+                  <th>Последний отчёт</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kpi.objects.map((o) => {
+                  const pct = o.working_days ? Math.round((100 * o.days_with_reports) / o.working_days) : 0;
+                  return (
+                    <tr key={o.object_id}>
+                      <td>
+                        <Link href={`/objects/${o.object_id}`}>{o.address}</Link>
+                        <div className="muted small">{OBJECT_STATUS_LABELS[o.status] ?? o.status}</div>
+                      </td>
+                      <td>{o.contractor ?? "—"}</td>
+                      <td className={o.working_days && pct < 85 ? "error-text nowrap" : "nowrap"}>
+                        {o.days_with_reports} из {o.working_days} ({pct} %)
+                      </td>
+                      <td className="nowrap">{o.last_report_at ? formatDate(o.last_report_at) : "нет"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 }

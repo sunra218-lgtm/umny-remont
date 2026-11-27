@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DEV_JWT_SECRET = "dev-only-secret-change-me-in-production-0123456789"  # noqa: S105
+DEV_BANK_SECRET = "dev-bank-webhook-secret"  # noqa: S105
 
 
 class Settings(BaseSettings):
@@ -15,6 +16,9 @@ class Settings(BaseSettings):
     env: Literal["dev", "test", "prod"] = "dev"
     database_url: str = "postgresql+asyncpg://umny:umny@localhost:5432/umny"
     redis_url: str = "redis://localhost:6379/0"
+    # Соединений с базой на один процесс uvicorn (по нагрузочному тесту спринта 7).
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
 
     jwt_secret: str = DEV_JWT_SECRET
     access_token_ttl_s: int = 15 * 60
@@ -47,7 +51,7 @@ class Settings(BaseSettings):
     # заказчик «оплачивает» резерв на тестовой странице сайта.
     # Настоящий банк подключается отдельным классом в app/modules/payments/bank.py.
     bank_backend: Literal["fake"] = "fake"
-    bank_webhook_secret: str = "dev-bank-webhook-secret"  # noqa: S105
+    bank_webhook_secret: str = DEV_BANK_SECRET
     bank_hold_ttl_s: int = 3 * 24 * 3600
     # Комиссия платформы с этапа в сотых долях процента (100 = 1 %).
     # Ставку задаёт владелец проекта.
@@ -76,6 +80,10 @@ class Settings(BaseSettings):
     phash_max_distance: int = 6
     device_signature_skew_s: int = 5 * 60
 
+    # Ограничение частоты запросов с одного IP (0 — выключено).
+    rate_limit_per_minute: int = 300
+    rate_limit_writes_per_minute: int = 60
+
     consent_text_version: str = "2026-11-v1"
     idempotency_ttl_s: int = 24 * 3600
 
@@ -95,6 +103,10 @@ class Settings(BaseSettings):
                 raise ValueError("OTP_DEBUG нельзя включать в prod")
             if not self.cookie_secure:
                 raise ValueError("В prod COOKIE_SECURE должен быть true")
+            if self.bank_webhook_secret == DEV_BANK_SECRET or len(self.bank_webhook_secret) < 32:
+                raise ValueError("В prod нужен собственный BANK_WEBHOOK_SECRET от 32 символов")
+            if not self.public_base_url.startswith("https://"):
+                raise ValueError("В prod PUBLIC_BASE_URL должен начинаться с https://")
         return self
 
 

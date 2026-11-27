@@ -4,11 +4,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN mkdir app && touch app/__init__.py && pip install -e ".[dev]"
+# Для сервера собирается без инструментов разработки: docker build --build-arg EXTRAS= .
+ARG EXTRAS=dev
+RUN mkdir app && touch app/__init__.py && pip install -e ".${EXTRAS:+[$EXTRAS]}"
 
 COPY . .
 RUN useradd --create-home --uid 1000 umny && mkdir -p /data/media && chown -R umny /app /data/media
 USER umny
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
+CMD ["sh", "-c", "alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --timeout-keep-alive 130"]

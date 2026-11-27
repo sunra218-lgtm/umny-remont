@@ -8,6 +8,7 @@ partially_delivered). Деньги заказчика лежат в резерв
 только после приёмки. Разница между ценой для заказчика и ценой поставщика — маржа платформы.
 """
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -904,7 +905,8 @@ async def receive(
     if len(data) > s.max_photo_bytes:
         raise Problem(413, "file-too-large", "Фото слишком большое")
     try:
-        info = inspect_image(data)
+        # Разбор фото занимает процессор: в отдельном потоке, чтобы не задерживать других.
+        info = await asyncio.to_thread(inspect_image, data)
     except NotAnImage as exc:
         raise Problem(422, "not-an-image", str(exc)) from None
     delivery = Delivery(

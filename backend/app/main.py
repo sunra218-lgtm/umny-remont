@@ -8,8 +8,10 @@ from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.idempotency import IdempotencyMiddleware
 from app.core.problems import install_problem_handlers
+from app.core.protection import RateLimitMiddleware, SecurityHeadersMiddleware
 from app.core.redis import get_redis
 from app.modules.acts.router import router as acts_router
+from app.modules.admin.kpi import router as kpi_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.links import router as links_router
 from app.modules.auth.router import router as auth_router
@@ -35,12 +37,16 @@ def create_app() -> FastAPI:
         title="Умный ремонт API",
         version="0.1.0",
         description="API платформы «Умный ремонт». Суммы — целые копейки (RUB).",
-        openapi_url="/api/v1/openapi.json",
-        docs_url="/api/docs",
+        # Описание API на сервере пилота не публикуется: меньше подсказок для атакующего.
+        openapi_url=None if settings.env == "prod" else "/api/v1/openapi.json",
+        docs_url=None if settings.env == "prod" else "/api/docs",
         redoc_url=None,
     )
     install_problem_handlers(app)
     app.add_middleware(IdempotencyMiddleware)
+    # Добавленный последним выполняется первым: лимит отсекает лишнее до всей остальной работы.
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -56,6 +62,7 @@ def create_app() -> FastAPI:
     api.include_router(me_router)
     api.include_router(orgs_router)
     api.include_router(admin_router)
+    api.include_router(kpi_router)
     api.include_router(objects_router)
     api.include_router(services_router)
     api.include_router(estimates_router)

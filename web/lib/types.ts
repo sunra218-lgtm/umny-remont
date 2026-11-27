@@ -356,3 +356,18 @@ export type PurchaseOrder = {
 };
 
 export type AppNotification = { id: string; text: string; status: "queued" | "sent" | "failed"; created_at: string };
+
+export type Kpi = {
+  metrics: { key: string; title: string; value: number; target: number; unit: string; ok: boolean; note: string | null }[];
+  objects: {
+    object_id: string;
+    address: string;
+    contractor: string | null;
+    status: string;
+    since: string;
+    working_days: number;
+    days_with_reports: number;
+    last_report_at: string | null;
+  }[];
+  generated_at: string;
+};
