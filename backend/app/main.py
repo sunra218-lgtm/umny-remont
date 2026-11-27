@@ -19,6 +19,7 @@ from app.modules.cameras.router import router as cameras_router
 from app.modules.catalog.router import router as catalog_router
 from app.modules.checklists.router import router as checklists_router
 from app.modules.daily.router import router as daily_router
+from app.modules.design.router import router as design_router
 from app.modules.disputes.router import router as disputes_router
 from app.modules.estimates.router import router as estimates_router
 from app.modules.field.router import router as field_router
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     api.include_router(guide_router)
     api.include_router(cameras_router)
     api.include_router(market_router)
+    api.include_router(design_router)
     api.include_router(inspections_router)
     api.include_router(payments_router)
     api.include_router(acts_router)

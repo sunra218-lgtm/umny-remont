@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     media_link_ttl_s: int = 15 * 60
     max_photo_bytes: int = 2 * 1024 * 1024
 
+    # Умный дизайн: внешние сервисы выключены, пока не заданы.
+    design_plan_reader: Literal["manual", "yandex_ocr"] = "manual"
+    design_renderer: Literal["preview", "yandexart"] = "preview"
+    content_factory_url: str | None = None
+    content_factory_key: str | None = None
+
     # Камеры на объекте: сколько хранить кадры и сколько ждать снимок с IP-камеры.
     camera_retention_days: int = 90
     camera_fetch_timeout_s: float = 10.0

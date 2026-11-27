@@ -5,6 +5,8 @@ python -m app.jobs expire     — закрыть корзины, не подтв
 python -m app.jobs reminders  — напомнить бригадам об отчёте за сегодня (обычно в 18:00)
 python -m app.jobs cameras    — забрать кадры с IP-камер
 python -m app.jobs purge      — удалить старые кадры камер
+python -m app.jobs renders    — картинки комнат дизайн-проекта
+python -m app.jobs videos     — статус роликов контент-завода
 python -m app.jobs worker     — всё вместе: очередь раз в 5 секунд, камеры раз в минуту,
                                 напоминания в 18:00 МСК, чистка кадров раз в час
 """
@@ -23,6 +25,7 @@ from app.core.security import utcnow
 from app.models import MediaReport, Notification, ObjectAssignment, RepairObject
 from app.models.enums import AssignmentRole, ObjectStatus
 from app.modules.cameras.service import capture_ip_cameras, purge_old_frames
+from app.modules.design.jobs import poll_videos, process_renders
 from app.modules.notifications import service as notes
 from app.modules.notifications.service import MSK
 from app.modules.procurement.router import expire_orders
@@ -105,6 +108,10 @@ async def worker() -> None:
                 await _with_db(capture_ip_cameras)
             if every("purge", 3600):
                 await _with_db(purge_old_frames)
+            if every("renders", 10):
+                await _with_db(process_renders)
+            if every("videos", 60):
+                await _with_db(poll_videos)
         except Exception:
             log.exception("Ошибка фоновой задачи")
         await asyncio.sleep(5)
@@ -116,6 +123,8 @@ JOBS = {
     "reminders": daily_reminders,
     "cameras": capture_ip_cameras,
     "purge": purge_old_frames,
+    "renders": process_renders,
+    "videos": poll_videos,
 }
 
 
