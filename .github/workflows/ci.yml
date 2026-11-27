@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: umny
+          POSTGRES_PASSWORD: umny
+          POSTGRES_DB: umny_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U umny" --health-interval 3s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://umny:umny@localhost:5432/umny_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: Линтер
+        run: ruff check . && ruff format --check .
+      - name: Миграции совпадают с моделями
+        run: |
+          DATABASE_URL=postgresql+asyncpg://umny:umny@localhost:5432/umny_test alembic upgrade head
+          DATABASE_URL=postgresql+asyncpg://umny:umny@localhost:5432/umny_test alembic check
+      - name: Тесты
+        run: pytest -q --cov --cov-report=term-missing --cov-fail-under=80
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Сборка образов
+        run: docker compose build
