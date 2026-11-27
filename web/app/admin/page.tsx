@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, download, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { OBJECT_STATUS_LABELS, DISPUTE_OUTCOME_LABELS, DISPUTE_STATUS_LABELS, formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
-import type { AdminUser, Dispute, Kpi, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
+import type { AdminUser, Dispute, Kpi, ModeStats, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
@@ -847,6 +847,46 @@ function PilotTab() {
           </button>
         </div>
       </section>
+      {kpi.modes && kpi.modes.length > 0 && (
+        <section className="card">
+          <h2>Подбор платформой или маркетплейс</h2>
+          <p className="muted small">Режим выбирается на каждом объекте. Сравниваем, где подрядчик находится быстрее и чаще доходит до работ.</p>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Показатель</th>
+                  {kpi.modes.map((m) => (
+                    <th key={m.mode}>{m.title}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    ["Объектов", (m: ModeStats) => String(m.objects)],
+                    ["Подрядчик найден", (m: ModeStats) => `${m.with_contractor} (${m.contractor_pct} %)`],
+                    ["Часов до подрядчика (медиана)", (m: ModeStats) => (m.hours_to_contractor ?? "—").toString()],
+                    ["Дошли до работ", (m: ModeStats) => `${m.reached_work} (${m.reached_work_pct} %)`],
+                    ["Откликов на заявку", (m: ModeStats) => (m.bids_per_task ?? "—").toString()],
+                    ["Заявок без откликов", (m: ModeStats) => (m.tasks_without_bids ?? "—").toString()],
+                    ["Оценка заказчиков", (m: ModeStats) => (m.avg_rating ? `${m.avg_rating} из 5 (${m.reviews})` : "—")],
+                  ] as [string, (m: ModeStats) => string][]
+                ).map(([label, value]) => (
+                  <tr key={label}>
+                    <td>{label}</td>
+                    {kpi.modes!.map((m) => (
+                      <td key={m.mode} className="nowrap">
+                        {value(m)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <section className="card">
         <h2>Фотоотчёты по объектам</h2>
         {kpi.objects.length === 0 ? (

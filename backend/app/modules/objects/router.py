@@ -67,6 +67,7 @@ async def object_out(db: DbSession, obj: RepairObject, flags: dict[str, bool]) -
         else None,
         contractor_org_id=obj.contractor_org_id,
         contractor_name=org.legal_name if org else None,
+        match_mode=obj.match_mode,
         created_at=obj.created_at,
         access=flags,
     )

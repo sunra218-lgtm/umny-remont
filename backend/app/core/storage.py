@@ -15,6 +15,7 @@ from app.core.config import get_settings
 class Storage(Protocol):
     async def put(self, key: str, data: bytes, content_type: str) -> None: ...
     async def get(self, key: str) -> bytes: ...
+    async def delete(self, key: str) -> None: ...
 
 
 class LocalStorage:
@@ -34,6 +35,9 @@ class LocalStorage:
 
     async def get(self, key: str) -> bytes:
         return await asyncio.to_thread(self._path(key).read_bytes)
+
+    async def delete(self, key: str) -> None:
+        await asyncio.to_thread(self._path(key).unlink, missing_ok=True)
 
 
 class S3Storage:
@@ -73,6 +77,9 @@ class S3Storage:
             return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
 
         return await asyncio.to_thread(_get)
+
+    async def delete(self, key: str) -> None:
+        await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=key)
 
 
 _storage: Storage | None = None

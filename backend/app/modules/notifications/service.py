@@ -43,6 +43,13 @@ TEMPLATES: dict[str, str] = {
     "day_returned": "Работы за {day} не приняты: {note}. {url}",
     "question_asked": "Вопрос бригады инженеру: {address}. Ответьте: {url}",
     "question_answered": "Инженер ответил на ваш вопрос: {url}",
+    "camera_added": (
+        "На объекте {address} подключили камеру. Она снимает, только если вы её включите: {url}"
+    ),
+    "market_task": "Новая заявка на ремонт: {area}. Откликнитесь: {url}",
+    "market_bid": "Новый отклик на ваш ремонт ({address}): {price}. Сравните отклики: {url}",
+    "market_won": "Заказчик выбрал вас: {address}. Объект: {url}",
+    "market_lost": "Заказчик выбрал другого подрядчика по заявке «{title}». Другие заявки: {url}",
     "daily_reminder": "Пришлите фотоотчёт за сегодня по объекту {address}: {url}",
 }
 

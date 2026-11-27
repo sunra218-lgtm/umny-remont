@@ -60,6 +60,10 @@ class RepairObject(UUIDPk, Timestamps, SoftDelete, Base):
         pg_enum(ObjectStatus, "object_status"), nullable=False, default=ObjectStatus.draft
     )
     bank_deal_id: Mapped[str | None] = mapped_column(String(100))
+    # Как ищем подрядчика: platform — подбирает платформа, market — заказчик выбирает из откликов.
+    match_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="platform", server_default="platform"
+    )
 
 
 class ObjectAssignment(UUIDPk, Base):

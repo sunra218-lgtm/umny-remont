@@ -881,3 +881,106 @@ audio {
   border: 1px solid var(--border);
   margin-top: var(--space);
 }
+
+/* Камеры */
+.break {
+  overflow-wrap: anywhere;
+}
+.timelapse img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius);
+}
+.timelapse input[type="range"] {
+  width: 100%;
+}
+.dim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  color: #555;
+  border: 0;
+  border-radius: 0;
+  font-size: 14px;
+}
+
+/* Маркетплейс */
+.field-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin: calc(var(--space) * 2) 0 calc(var(--space) * 0.5);
+}
+.filters {
+  display: grid;
+  gap: 0 calc(var(--space) * 2);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.stars {
+  color: #c98a00;
+  letter-spacing: 1px;
+}
+.contractor {
+  display: flex;
+  gap: calc(var(--space) * 2);
+  align-items: flex-start;
+  min-width: 0;
+}
+.contractor-cover {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: none;
+}
+.mode-pick {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: calc(var(--space) * 2);
+}
+.mode-pick .mode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  min-height: 44px;
+  padding: calc(var(--space) * 1.5);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: inherit;
+  font-weight: 400;
+}
+.mode-pick .mode[aria-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.star-btn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 24px;
+  background: none;
+  border: 0;
+  color: #c98a00;
+  padding: 0;
+}
+.portfolio {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.portfolio img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+}

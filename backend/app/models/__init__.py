@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.cameras import Camera, CameraFrame
 from app.models.identity import (
     AuditLog,
     AuthLink,
@@ -10,6 +11,13 @@ from app.models.identity import (
     User,
 )
 from app.models.knowledge import DailyPlan, DailyPlanItem, EngineerQuestion, TechCard
+from app.models.market import (
+    ContractorProfile,
+    ContractorReview,
+    MarketBid,
+    MarketTask,
+    PortfolioPhoto,
+)
 from app.models.money_flow import (
     Act,
     Delivery,
@@ -37,6 +45,13 @@ from app.models.work import (
 )
 
 __all__ = [
+    "ContractorProfile",
+    "ContractorReview",
+    "MarketBid",
+    "MarketTask",
+    "PortfolioPhoto",
+    "Camera",
+    "CameraFrame",
     "EngineerQuestion",
     "DailyPlan",
     "DailyPlanItem",

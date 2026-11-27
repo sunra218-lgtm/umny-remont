@@ -96,6 +96,7 @@ export type RepairObject = {
   customer: Person | null;
   contractor_org_id: string | null;
   contractor_name: string | null;
+  match_mode?: "platform" | "market";
   created_at: string;
   access: {
     is_customer: boolean;
@@ -371,7 +372,23 @@ export type Kpi = {
     days_with_reports: number;
     last_report_at: string | null;
   }[];
+  modes?: ModeStats[];
   generated_at: string;
+};
+
+export type ModeStats = {
+  mode: "platform" | "market";
+  title: string;
+  objects: number;
+  with_contractor: number;
+  contractor_pct: number;
+  hours_to_contractor: number | null;
+  reached_work: number;
+  reached_work_pct: number;
+  bids_per_task: number | null;
+  tasks_without_bids: number | null;
+  avg_rating: number | null;
+  reviews: number;
 };
 
 export type TechStep = {
@@ -482,3 +499,115 @@ export type EngineerQuestion = {
   created_at: string;
   can_answer: boolean;
 };
+
+export type CameraState = "off" | "paused" | "sleeping" | "no_signal" | "live";
+
+export type Camera = {
+  id: string;
+  object_id: string;
+  title: string;
+  kind: "ip" | "phone";
+  snapshot_url: string | null;
+  interval_min: number;
+  hour_from: number;
+  hour_to: number;
+  enabled: boolean;
+  consent_at: string | null;
+  state: CameraState;
+  last_frame_at: string | null;
+  last_seen_at: string | null;
+  last_error: string | null;
+  latest_frame_url: string | null;
+  frames_today: number;
+  can_toggle: boolean;
+  can_edit: boolean;
+  phone_link: string | null;
+};
+
+export type CameraFrame = {
+  id: string;
+  taken_at: string;
+  url: string;
+  changed: boolean;
+  stage_id: string | null;
+  stage_title: string | null;
+  hidden_work: boolean;
+  labels: { note?: string; hidden_steps?: string[]; source?: string };
+  labeled_by: "auto" | "engineer";
+};
+
+export type CameraFrames = {
+  day: string;
+  days: { day: string; frames: number; changed: number }[];
+  frames: CameraFrame[];
+  can_label: boolean;
+};
+
+export type PhoneCameraStatus = {
+  title: string;
+  enabled: boolean;
+  state: CameraState;
+  message: string;
+  interval_min: number;
+  hour_from: number;
+  hour_to: number;
+  next_in_s: number;
+  frames_today: number;
+};
+
+export type ContractorCard = {
+  org_id: string;
+  name: string;
+  legal_name: string;
+  kind: "company" | "brigade";
+  city: string | null;
+  specializations: string[];
+  team_size: number | null;
+  since_year: number | null;
+  verified: boolean;
+  accepts_tasks: boolean;
+  rating: number | null;
+  reviews: number;
+  objects_done: number;
+  objects_in_work: number;
+  cover_url: string | null;
+};
+
+export type ContractorFull = ContractorCard & {
+  about: string | null;
+  portfolio: { id: string; url: string; caption: string | null }[];
+  review_list: { rating: number; text: string | null; created_at: string }[];
+  can_edit: boolean;
+};
+
+export type MarketBid = {
+  id: string;
+  org_id: string;
+  contractor: ContractorCard | null;
+  price_kop: number;
+  days: number;
+  start_date: string | null;
+  message: string | null;
+  status: "submitted" | "accepted" | "rejected" | "withdrawn";
+  created_at: string;
+};
+
+export type MarketTask = {
+  id: string;
+  object_id: string;
+  title: string;
+  description: string | null;
+  area_hint: string;
+  area_m2: number | null;
+  work_types: string[];
+  budget_kop: number | null;
+  desired_start: string | null;
+  bids_until: string | null;
+  status: "open" | "awarded" | "closed";
+  created_at: string;
+  bids_count: number;
+  bids: MarketBid[];
+  my_bid: MarketBid | null;
+};
+
+export type ContractorReview = { rating: number; text: string | null; created_at: string };

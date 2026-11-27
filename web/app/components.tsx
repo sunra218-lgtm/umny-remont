@@ -15,6 +15,10 @@ export function Header() {
       {me && (
         <nav className="topnav">
           <Link href="/objects">Объекты</Link>
+          <Link href="/contractors">Подрядчики</Link>
+          {(me.is_platform_admin || me.memberships.some((m) => m.org_type === "contractor" && (m.role === "contractor_admin" || m.role === "estimator"))) && (
+            <Link href="/market">Заявки</Link>
+          )}
           {(me.is_platform_admin || me.memberships.some((m) => m.role === "inspector")) && <Link href="/inspections">Выезды</Link>}
           {(me.is_platform_admin || me.memberships.some((m) => m.role === "procurement_manager" || m.role === "supplier_manager")) && (
             <Link href="/procurement">Закупки</Link>
