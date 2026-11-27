@@ -163,3 +163,23 @@ export const REVIEW_LABELS: Record<string, string> = {
   approved: "Фото принято",
   rejected: "Фото отклонено",
 };
+
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  created: "Создан",
+  pending_funding: "Ждёт оплаты",
+  held: "Деньги зарезервированы",
+  release_requested: "Выплата в банке",
+  released: "Выплачено подрядчику",
+  frozen: "Заморожено",
+  refunded: "Возвращено",
+  failed: "Не прошло",
+};
+
+export const ACT_STATUS_LABELS: Record<string, string> = {
+  draft: "Черновик",
+  sent: "Ждёт подписи подрядчика",
+  signed_contractor: "Ждёт подписи заказчика",
+  signed_customer: "Подписан, идёт выплата",
+  released: "Подписан и оплачен",
+  rejected: "Отклонён",
+};

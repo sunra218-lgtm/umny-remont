@@ -11,11 +11,14 @@ import {
   FRAUD_FLAG_LABELS,
   INSPECTION_RESULT_LABELS,
   personName,
+  ACT_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
   REVIEW_LABELS,
+  rub,
   STAGE_STATUS_LABELS,
   STAGE_TYPE_LABELS,
 } from "@/lib/format";
-import type { Inspection, MediaItem, Me, Member, Page, Stage, StageChecklist } from "@/lib/types";
+import type { Act, Inspection, MediaItem, Me, Member, Page, Payment, Stage, StageChecklist } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
 
@@ -76,6 +79,8 @@ export default function StagePage() {
       <ErrorNote text={error} />
       <div className="split">
         <div>
+          <Money detail={detail} onChanged={load} />
+          <Acts detail={detail} onChanged={load} />
           <Actions detail={detail} checklist={checklist} onChanged={load} />
           <Photos detail={detail} onChanged={load} />
         </div>
@@ -106,13 +111,6 @@ function Actions({ detail, checklist, onChanged }: { detail: StageDetail; checkl
   }
 
   const buttons: ReactElement[] = [];
-  if (detail.is_admin && ["planned", "funding"].includes(stage.status)) {
-    buttons.push(
-      <button key="fund" className="secondary" onClick={() => void run("mark-funded", () => "Этап готов к работе.")}>
-        Отметить резерв денег
-      </button>,
-    );
-  }
   if (detail.can_work && stage.status === "ready") {
     buttons.push(
       <button key="start" className="primary" onClick={() => void run("start", () => "Работы начаты.")}>
@@ -141,11 +139,6 @@ function Actions({ detail, checklist, onChanged }: { detail: StageDetail; checkl
   return (
     <section className="card">
       <h2>Что дальше</h2>
-      {detail.is_admin && ["planned", "funding"].includes(stage.status) && (
-        <p className="muted">
-          Пока банк не подключён, резерв денег отмечает администратор. Начать работы можно после резерва.
-        </p>
-      )}
       {stage.status === "in_progress" && missing.length > 0 && (
         <p className="devnote">Нет фото по пунктам чек-листа: {missing.map((m) => m.title).join(", ")}. Сдать этап можно, но проверяющий это увидит.</p>
       )}
@@ -390,6 +383,222 @@ function Inspections({ detail, inspections, me, onChanged }: { detail: StageDeta
             Подписать результат
           </button>
         </form>
+      )}
+      <ErrorNote text={error} />
+    </section>
+  );
+}
+
+function Money({ detail, onChanged }: { detail: StageDetail; onChanged: () => Promise<void> }) {
+  const [payments, setPayments] = useState<Payment[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { stage } = detail;
+
+  const load = useCallback(async () => {
+    try {
+      setPayments(await api<Payment[]>(`/stages/${stage.id}/payments`));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [stage.id]);
+  useEffect(() => void load(), [load, stage.status]);
+
+  async function hold() {
+    setError(null);
+    try {
+      const p = await api<Payment>(`/stages/${stage.id}/payments/hold`, { method: "POST" });
+      if (p.pay_url) location.assign(p.pay_url);
+      else await Promise.all([load(), onChanged()]);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  if (payments === null) return null;
+  const current = payments.find((p) => p.status !== "failed" && p.status !== "refunded");
+  const total = stage.work_budget_kop + stage.material_budget_kop;
+  const canHold = detail.is_customer && ["planned", "funding"].includes(stage.status) && total > 0 && ["contracting", "active"].includes(detail.object_status);
+  return (
+    <section className="card">
+      <h2>Деньги этапа</h2>
+      {current ? (
+        <>
+          <p>
+            <span className={`status status-${current.status === "held" || current.status === "released" ? "approved" : "submitted"}`}>
+              {PAYMENT_STATUS_LABELS[current.status]}
+            </span>{" "}
+            <b>{rub(current.amount_kop)}</b>
+          </p>
+          <dl className="facts">
+            <dt>Работы</dt>
+            <dd>{rub(current.breakdown.work_kop ?? 0)}</dd>
+            <dt>Материалы</dt>
+            <dd>{rub(current.breakdown.material_kop ?? 0)}</dd>
+            {Boolean(current.breakdown.platform_fee_kop) && (
+              <>
+                <dt>Комиссия платформы</dt>
+                <dd>{rub(current.breakdown.platform_fee_kop ?? 0)}</dd>
+              </>
+            )}
+          </dl>
+          {current.status === "held" && (
+            <p className="muted">Деньги лежат в банке и уйдут подрядчику только после того, как вы подпишете акт этапа.</p>
+          )}
+          {current.status === "pending_funding" && detail.is_customer && current.pay_url && (
+            <a className="button primary" href={current.pay_url}>
+              Перейти к оплате
+            </a>
+          )}
+        </>
+      ) : canHold ? (
+        <>
+          <p>
+            Чтобы бригада начала этап, зарезервируйте <b>{rub(total)}</b>. Деньги остаются в банке и уходят подрядчику только после
+            вашей подписи акта.
+          </p>
+          <button className="primary" onClick={() => void hold()}>
+            Зарезервировать {rub(total)}
+          </button>
+        </>
+      ) : (
+        <p className="muted">
+          {total > 0 ? "Заказчик ещё не зарезервировал деньги на этап." : "Сумма этапа появится после утверждения полной сметы."}
+        </p>
+      )}
+      {payments.some((p) => p.status === "failed") && !current && <p className="muted">Прошлая оплата не прошла, можно попробовать ещё раз.</p>}
+      <ErrorNote text={error} />
+    </section>
+  );
+}
+
+function Acts({ detail, onChanged }: { detail: StageDetail; onChanged: () => Promise<void> }) {
+  const [acts, setActs] = useState<Act[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [signing, setSigning] = useState<{ actId: string; signatureId: string; debug: string | null } | null>(null);
+  const [code, setCode] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const { stage } = detail;
+
+  const load = useCallback(async () => {
+    try {
+      setActs(await api<Act[]>(`/stages/${stage.id}/acts`));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [stage.id]);
+  useEffect(() => void load(), [load, stage.status]);
+
+  async function act(fn: () => Promise<unknown>) {
+    setError(null);
+    try {
+      await fn();
+      await Promise.all([load(), onChanged()]);
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  async function requestCode(a: Act) {
+    setError(null);
+    try {
+      const r = await api<{ signature_id: string; debug_code: string | null }>(`/acts/${a.id}/sign/request`, { method: "POST" });
+      setSigning({ actId: a.id, signatureId: r.signature_id, debug: r.debug_code });
+      setCode("");
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  if (acts === null) return null;
+  const open = acts.find((a) => !["rejected"].includes(a.status));
+  const canCreate = detail.can_work && !detail.is_customer && stage.status === "acceptance" && !open;
+  if (acts.length === 0 && !canCreate) return null;
+  return (
+    <section className="card">
+      <h2>Акт сдачи-приёмки</h2>
+      {acts.map((a) => (
+        <div key={a.id} className="boxed">
+          <p>
+            <b>Акт № {a.number}</b> · {rub(a.work_kop + a.material_kop)}{" "}
+            <span className={`status status-${a.status === "released" ? "approved" : a.status === "rejected" ? "cancelled" : "submitted"}`}>
+              {ACT_STATUS_LABELS[a.status]}
+            </span>
+          </p>
+          <div className="muted small">
+            {a.contractor_signed_at && <div>Подрядчик подписал {formatDate(a.contractor_signed_at)}</div>}
+            {a.customer_signed_at && <div>Заказчик подписал {formatDate(a.customer_signed_at)}</div>}
+            {a.reject_reason && <div>Причина отказа: {a.reject_reason}</div>}
+          </div>
+          {a.can_sign && signing?.actId !== a.id && (
+            <div className="row">
+              <button className="primary" onClick={() => void requestCode(a)}>
+                {detail.is_customer ? "Принять работы и подписать" : "Подписать акт"}
+              </button>
+              {a.can_reject && (
+                <button className="secondary" onClick={() => setRejecting(true)}>
+                  Отклонить акт
+                </button>
+              )}
+            </div>
+          )}
+          {signing?.actId === a.id && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act(async () => {
+                  await api(`/acts/${a.id}/sign/confirm`, { method: "POST", body: { signature_id: signing.signatureId, code } });
+                  setSigning(null);
+                });
+              }}
+            >
+              {detail.is_customer && (
+                <p className="muted">После подписи деньги этапа уйдут подрядчику. Подписывайте, только если работы приняты.</p>
+              )}
+              <label htmlFor="act-code">Код из СМС</label>
+              <input id="act-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
+              {signing.debug && (
+                <p className="devnote">
+                  Режим разработки: код <b>{signing.debug}</b>
+                </p>
+              )}
+              <button type="submit" className="primary" disabled={code.length !== 6}>
+                Подписать кодом
+              </button>
+            </form>
+          )}
+          {rejecting && a.can_reject && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act(async () => {
+                  await api(`/acts/${a.id}/reject`, { method: "POST", body: { reason } });
+                  setRejecting(false);
+                  setReason("");
+                });
+              }}
+            >
+              <label htmlFor="act-reason">Что не так с работами</label>
+              <textarea id="act-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+              <div className="row">
+                <button type="submit" className="danger" disabled={reason.trim().length < 3}>
+                  Отклонить акт и вернуть в работу
+                </button>
+                <button type="button" className="secondary" onClick={() => setRejecting(false)}>
+                  Отмена
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      ))}
+      {canCreate && (
+        <>
+          <p className="muted">Этап сдан. Сформируйте акт: его подписываете вы, затем заказчик, и деньги этапа приходят вам.</p>
+          <button className="primary" onClick={() => void act(() => api(`/stages/${stage.id}/acts`, { method: "POST" }))}>
+            Сформировать акт
+          </button>
+        </>
       )}
       <ErrorNote text={error} />
     </section>

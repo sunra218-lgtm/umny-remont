@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     price_acceptance_kop: int = 740_000
     price_survey_kop: int = 740_000
 
+    # Банк безопасной сделки. fake — имитация для разработки и тестов:
+    # заказчик «оплачивает» резерв на тестовой странице сайта.
+    # Настоящий банк подключается отдельным классом в app/modules/payments/bank.py.
+    bank_backend: Literal["fake"] = "fake"
+    bank_webhook_secret: str = "dev-bank-webhook-secret"  # noqa: S105
+    bank_hold_ttl_s: int = 3 * 24 * 3600
+    # Комиссия платформы с этапа в сотых долях процента (100 = 1 %).
+    # Ставку задаёт владелец проекта.
+    platform_fee_bp: int = 0
+
     # Адрес сайта: из него собираются ссылки для входа бригад.
     public_base_url: str = "http://localhost:3000"
     auth_link_ttl_s: int = 30 * 60
