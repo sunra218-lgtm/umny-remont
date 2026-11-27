@@ -8,7 +8,9 @@ import { api, errorText } from "@/lib/api";
 import { enqueue, sha256Hex, sign } from "@/lib/device";
 import { useLite } from "@/lib/lite";
 
-import { LiteGate } from "../parts";
+import type { StageChecklist } from "@/lib/types";
+
+import { cacheGet, cacheSet, LiteGate } from "../parts";
 
 type Challenge = { challenge_id: string; code: string; ttl_s: number; receivedAt: number };
 type Geo = { lat: number; lon: number; accuracy: number };
@@ -44,6 +46,25 @@ function Capture() {
   const [busy, setBusy] = useState(false);
   const [shots, setShots] = useState(0);
   const [geoState, setGeoState] = useState<"wait" | "ok" | "off">("wait");
+  const [checklist, setChecklist] = useState<StageChecklist | null>(() => cacheGet(`lite:checklist:${stageId}`));
+  const [itemId, setItemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!stageId) return;
+    api<StageChecklist>(`/stages/${stageId}/checklist`)
+      .then((c) => {
+        setChecklist(c);
+        cacheSet(`lite:checklist:${stageId}`, c);
+      })
+      .catch(() => undefined);
+  }, [stageId]);
+
+  useEffect(() => {
+    // Сразу предлагаем первый несделанный обязательный пункт.
+    if (checklist && itemId === null && checklist.items.length) setItemId(checklist.missing[0] ?? checklist.items[0].id);
+  }, [checklist, itemId]);
+
+  const item = checklist?.items.find((i) => i.id === itemId) ?? null;
 
   const fresh = (c: Challenge) => performance.now() - c.receivedAt < (c.ttl_s - 30) * 1000;
 
@@ -110,7 +131,7 @@ function Capture() {
       const blob = await frameToBlob(video, [
         challenge ? `Код ${challenge.code}` : "Без кода (нет связи)",
         now.toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }),
-        `${address} · ${stageTitle}`,
+        `${address} · ${stageTitle}${item ? ` · ${item.title}` : ""}`,
       ]);
       const sha = await sha256Hex(await blob.arrayBuffer());
       const signature = await sign(device.keys, `${sha}:${challenge?.code ?? ""}`);
@@ -125,9 +146,21 @@ function Capture() {
         capturedAt: now.toISOString(),
         elapsedMs: challenge ? performance.now() - challenge.receivedAt : null,
         geo: geo.current,
+        checklistItemId: item?.id ?? null,
         error: null,
       });
       setShots((n) => n + 1);
+      if (checklist && item) {
+        // Отмечаем снятый пункт и переходим к следующему несделанному.
+        const updated = {
+          ...checklist,
+          items: checklist.items.map((i) => (i.id === item.id ? { ...i, photos: i.photos + 1 } : i)),
+          missing: checklist.missing.filter((id) => id !== item.id),
+        };
+        setChecklist(updated);
+        cacheSet(`lite:checklist:${stageId}`, updated);
+        if (updated.missing.length) setItemId(updated.missing[0]);
+      }
       await refreshQueue();
       void sync();
       void refill();
@@ -146,6 +179,26 @@ function Capture() {
       </p>
       <h1>{stageTitle}</h1>
       <p className="muted">{address}</p>
+      {checklist && checklist.items.length > 0 && (
+        <>
+          <ul className="chips" aria-label="Что снимать">
+            {checklist.items.map((i) => (
+              <li key={i.id}>
+                <button type="button" className="chip" aria-pressed={i.id === itemId} onClick={() => setItemId(i.id)}>
+                  {i.photos > 0 && <span className="done">✓ </span>}
+                  {i.title}
+                </button>
+              </li>
+            ))}
+            <li>
+              <button type="button" className="chip" aria-pressed={itemId === ""} onClick={() => setItemId("")}>
+                Другое
+              </button>
+            </li>
+          </ul>
+          {item?.required_angle && <p className="muted small">Как снять: {item.required_angle}</p>}
+        </>
+      )}
       {cameraError ? (
         <p className="error" role="alert">
           {cameraError}

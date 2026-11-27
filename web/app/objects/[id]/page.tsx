@@ -18,8 +18,11 @@ import {
   parseRub,
   personName,
   rub,
+  REVIEW_LABELS,
   SERVICE_STATUS_LABELS,
   SERVICE_TYPE_LABELS,
+  STAGE_STATUS_LABELS,
+  STAGE_TYPE_LABELS,
 } from "@/lib/format";
 import type {
   Assignment,
@@ -468,6 +471,7 @@ function Estimates({ obj }: { obj: RepairObject }) {
 function Stages({ obj }: { obj: RepairObject }) {
   const [stages, setStages] = useState<Stage[] | null>(null);
   const [title, setTitle] = useState("");
+  const [stageType, setStageType] = useState("");
   const [stop, setStop] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
@@ -483,8 +487,12 @@ function Stages({ obj }: { obj: RepairObject }) {
     e.preventDefault();
     setError(null);
     try {
-      await api(`/objects/${obj.id}/stages`, { method: "POST", body: { title, is_stop_point: stop } });
+      await api(`/objects/${obj.id}/stages`, {
+        method: "POST",
+        body: { title, is_stop_point: stop, stage_type: stageType || null },
+      });
       setTitle("");
+      setStageType("");
       setStop(false);
       await load();
     } catch (err) {
@@ -506,6 +514,7 @@ function Stages({ obj }: { obj: RepairObject }) {
               <tr>
                 <th>№</th>
                 <th>Этап</th>
+                <th>Статус</th>
                 <th className="num">Работы</th>
                 <th className="num">Материалы</th>
               </tr>
@@ -515,8 +524,11 @@ function Stages({ obj }: { obj: RepairObject }) {
                 <tr key={s.id}>
                   <td>{s.seq}</td>
                   <td>
-                    {s.title}
+                    <Link href={`/stages/${s.id}`}>{s.title}</Link>
                     {s.is_stop_point && <span className="badge">проверка технадзора</span>}
+                  </td>
+                  <td className="nowrap">
+                    <span className={`status status-${s.status}`}>{STAGE_STATUS_LABELS[s.status] ?? s.status}</span>
                   </td>
                   <td className="num">{rub(s.work_budget_kop)}</td>
                   <td className="num">{rub(s.material_budget_kop)}</td>
@@ -531,6 +543,25 @@ function Stages({ obj }: { obj: RepairObject }) {
           <div>
             <label htmlFor="stage-title">Новый этап</label>
             <input id="stage-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Электрика" />
+          </div>
+          <div>
+            <label htmlFor="stage-type">Вид работ (для чек-листа фото)</label>
+            <select
+              id="stage-type"
+              value={stageType}
+              onChange={(e) => {
+                setStageType(e.target.value);
+                if (!title.trim() && e.target.value) setTitle(STAGE_TYPE_LABELS[e.target.value]);
+                if (["electric", "plumbing", "waterproofing"].includes(e.target.value)) setStop(true);
+              }}
+            >
+              <option value="">Другое</option>
+              {Object.entries(STAGE_TYPE_LABELS).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </div>
           <label className="check" style={{ alignSelf: "center" }}>
             <input type="checkbox" checked={stop} onChange={(e) => setStop(e.target.checked)} />
@@ -728,7 +759,14 @@ function Feed({ obj }: { obj: RepairObject }) {
                   </a>
                   <figcaption>
                     {m.stage_title ?? "Без этапа"} · {formatDate(m.received_server_at)}
+                    {m.checklist_item_title && <div>{m.checklist_item_title}</div>}
                     {m.author_name && <div>{m.author_name}</div>}
+                    {m.review_status !== "pending" && (
+                      <div className={m.review_status === "rejected" ? "error-text" : "ok"}>
+                        {REVIEW_LABELS[m.review_status]}
+                        {m.review_comment && `: ${m.review_comment}`}
+                      </div>
+                    )}
                     {m.fraud_flags &&
                       Object.keys(m.fraud_flags).map((f) => (
                         <span className="flag" key={f}>

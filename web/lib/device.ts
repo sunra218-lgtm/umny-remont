@@ -73,6 +73,7 @@ export type QueuedPhoto = {
   stageId: string;
   stageTitle: string;
   address: string;
+  checklistItemId?: string | null;
   blob: Blob;
   signature: string;
   challengeId: string | null;

@@ -182,10 +182,13 @@ export type MediaItem = {
   object_id: string;
   stage_id: string | null;
   stage_title: string | null;
+  checklist_item_id: string | null;
+  checklist_item_title: string | null;
   author_name: string | null;
   received_server_at: string;
   captured_client_at: string | null;
-  review_status: string;
+  review_status: "pending" | "approved" | "rejected";
+  review_comment: string | null;
   fraud_flags: Record<string, unknown> | null;
   url: string;
 };
@@ -199,4 +202,39 @@ export type OrgDevice = {
   user_agent: string | null;
   created_at: string;
   last_seen_at: string;
+};
+
+export type ChecklistRow = {
+  id: string;
+  seq: number;
+  title: string;
+  required_angle: string | null;
+  photo_required: boolean;
+  photos: number;
+};
+
+export type StageChecklist = { stage_id: string; template_title: string | null; items: ChecklistRow[]; missing: string[] };
+
+export type ChecklistTemplate = {
+  id: string;
+  stage_type: string;
+  stage_type_title: string;
+  title: string;
+  items: { id: string; seq: number; title: string; required_angle: string | null; photo_required: boolean }[];
+};
+
+export type Inspection = {
+  id: string;
+  stage_id: string;
+  stage_title: string;
+  stage_status: string;
+  object_id: string;
+  address: string;
+  inspector_id: string;
+  inspector_name: string;
+  scheduled_at: string | null;
+  result: "passed" | "failed" | "remarks" | null;
+  remarks: string | null;
+  signed_at: string | null;
+  created_at: string;
 };

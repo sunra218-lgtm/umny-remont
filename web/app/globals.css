@@ -538,7 +538,7 @@ a.button.primary:hover {
 .camera-code {
   position: absolute;
   left: var(--space);
-  bottom: var(--space);
+  top: var(--space);
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-weight: 600;
@@ -592,4 +592,102 @@ a.button.primary:hover {
 .devnote a,
 .mono {
   overflow-wrap: anywhere;
+}
+.error-text {
+  color: var(--danger);
+}
+.status-ready,
+.status-accepted {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.status-in_progress,
+.status-inspection,
+.status-acceptance,
+.status-funding {
+  background: var(--warn-soft);
+  color: var(--text);
+}
+.status-frozen {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 calc(var(--space) * 2);
+}
+.chip {
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 calc(var(--space) * 1.5);
+  font-size: 14px;
+}
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.chip .done {
+  color: var(--accent);
+}
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.checklist li {
+  display: flex;
+  gap: var(--space);
+  padding: var(--space) 0;
+  border-bottom: 1px solid var(--border);
+}
+.checklist li:last-child {
+  border-bottom: 0;
+}
+.checklist .mark {
+  flex: none;
+  width: 24px;
+  text-align: center;
+  font-weight: 700;
+}
+.checklist .mark.ok {
+  color: var(--accent);
+}
+.checklist .mark.no {
+  color: var(--danger);
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space);
+}
+legend {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: var(--space);
+}
+.brand {
+  white-space: nowrap;
+}
+.topnav {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 4px;
+}
+@media (max-width: 480px) {
+  .topbar {
+    gap: var(--space);
+  }
+  .topnav {
+    gap: 4px calc(var(--space) * 1.5);
+    font-size: 15px;
+  }
 }

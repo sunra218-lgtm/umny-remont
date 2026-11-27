@@ -37,6 +37,7 @@ async function uploadOne(item: QueuedPhoto): Promise<void> {
   form.append("file", item.blob, `${item.id}.${item.blob.type === "image/webp" ? "webp" : "jpg"}`);
   form.append("signature", item.signature);
   if (item.challengeId) form.append("challenge_id", item.challengeId);
+  if (item.checklistItemId) form.append("checklist_item_id", item.checklistItemId);
   form.append("captured_client_at", item.capturedAt);
   if (item.elapsedMs !== null) form.append("elapsed_ms", String(Math.round(item.elapsedMs)));
   if (item.geo) {

@@ -56,7 +56,9 @@ class MediaOut(BaseModel):
     author_name: str | None = None
     received_server_at: datetime
     captured_client_at: datetime | None
+    checklist_item_title: str | None = None
     review_status: str
+    review_comment: str | None = None
     fraud_flags: dict[str, Any] | None = None
     url: str
 
@@ -246,8 +248,11 @@ async def upload_media(
             if dist > s.geo_max_distance_m:
                 flags["geo_mismatch"] = {"distance_m": int(dist)}
 
-    if checklist_item_id is not None and await db.get(ChecklistItem, checklist_item_id) is None:
-        raise Problem(422, "checklist-item-not-found", "Пункт чек-листа не найден")
+    if checklist_item_id is not None:
+        from app.modules.inspections.router import checklist_item_ok
+
+        if not await checklist_item_ok(db, stage, checklist_item_id):
+            raise Problem(422, "checklist-item-not-found", "Пункт чек-листа не из этого этапа")
 
     media_id = uuid7()
     flags |= await _duplicate_flags(db, sha256, info.phash, media_id)
@@ -309,8 +314,9 @@ async def feed(
     # Пометки антифрода видят проверяющие, а не заказчик.
     show_flags = not access.is_customer or access.is_admin
     stmt = (
-        select(MediaReport, Stage.title, User.full_name, User.phone)
+        select(MediaReport, Stage.title, User.full_name, User.phone, ChecklistItem.title)
         .outerjoin(Stage, Stage.id == MediaReport.stage_id)
+        .outerjoin(ChecklistItem, ChecklistItem.id == MediaReport.checklist_item_id)
         .join(User, User.id == MediaReport.author_id)
         .where(MediaReport.object_id == object_id)
     )
@@ -326,14 +332,16 @@ async def feed(
             stage_id=m.stage_id,
             stage_title=title,
             checklist_item_id=m.checklist_item_id,
+            checklist_item_title=item_title,
             author_name=name or phone,
+            review_comment=m.review_comment,
             received_server_at=m.received_server_at,
             captured_client_at=m.captured_client_at,
             review_status=m.review_status.value,
             fraud_flags=m.fraud_flags if show_flags else None,
             url=signed_media_url(m.id, current.id),
         )
-        for m, title, name, phone in rows[:limit]
+        for m, title, name, phone, item_title in rows[:limit]
     ]
     next_cursor = str(rows[limit - 1][0].id) if len(rows) > limit else None
     return Page(items=items, next_cursor=next_cursor)

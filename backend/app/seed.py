@@ -9,7 +9,7 @@ import asyncio
 from sqlalchemy import func, select
 
 from app.core.db import get_engine, get_session
-from app.models import PriceItem
+from app.models import ChecklistItem, ChecklistTemplate, PriceItem
 from app.models.enums import EstimateItemCategory
 
 W = EstimateItemCategory.work
@@ -64,9 +64,114 @@ async def seed_catalog() -> int:
     return len(CATALOG)
 
 
+# Чек-листы ракурсов: (тип этапа, название, [(пункт, ракурс, нужно ли фото)]).
+# Стартовый набор для пилота; инженер технадзора уточнит его в админке.
+CHECKLISTS: list[tuple[str, str, list[tuple[str, str | None, bool]]]] = [
+    (
+        "demolition",
+        "Демонтаж",
+        [
+            ("Помещение до начала работ", "Общий план от входа в каждую комнату", True),
+            (
+                "Демонтированные перегородки",
+                "Место бывшей перегородки, пол и потолок в кадре",
+                True,
+            ),
+            ("Мусор вывезен", "Общий план, пустое помещение", True),
+        ],
+    ),
+    (
+        "walls",
+        "Перегородки и штукатурка",
+        [
+            ("Кладка перегородки", "Перегородка целиком, видны швы и примыкание к потолку", True),
+            ("Маяки выставлены", "Стена под углом, видны маяки и правило", True),
+            ("Стена после штукатурки", "Правило 2 м приложено к стене, виден просвет", True),
+        ],
+    ),
+    (
+        "electric",
+        "Электрика — скрытые работы",
+        [
+            ("Трассы кабеля в штробах", "Каждая стена целиком до заделки штроб, с рулеткой", True),
+            ("Подрозетники", "Крупно, с уровнем", True),
+            ("Электрощит собран", "Щит открыт, видны автоматы и подписи", True),
+            ("Замер сопротивления изоляции", "Экран прибора и подключение", False),
+        ],
+    ),
+    (
+        "plumbing",
+        "Сантехника — скрытые работы",
+        [
+            ("Разводка водоснабжения", "Все трубы до закрытия, с рулеткой", True),
+            ("Разводка канализации", "Уклон труб, уровень в кадре", True),
+            ("Опрессовка", "Манометр с давлением и временем", True),
+        ],
+    ),
+    (
+        "waterproofing",
+        "Гидроизоляция",
+        [
+            ("Гидроизоляция пола", "Весь пол санузла, заход на стены", True),
+            ("Примыкания и углы", "Крупно: углы, трубы, лента", True),
+            ("Пролив водой", "Залитый пол и отметка уровня", False),
+        ],
+    ),
+    (
+        "screed",
+        "Стяжка пола",
+        [
+            ("Маяки и демпферная лента", "Общий план до заливки", True),
+            ("Стяжка готова", "Правило 2 м на стяжке, виден просвет", True),
+        ],
+    ),
+    (
+        "tiling",
+        "Плитка",
+        [
+            ("Раскладка плитки", "Стена или пол целиком", True),
+            ("Швы и углы", "Крупно, с крестиками или затиркой", True),
+        ],
+    ),
+    (
+        "finishing",
+        "Чистовая отделка",
+        [
+            ("Стены под покраску", "Боковой свет вдоль стены", True),
+            ("Покраска готова", "Общий план комнаты", True),
+            ("Напольное покрытие", "Общий план и стыки у порогов", True),
+        ],
+    ),
+]
+
+
+async def seed_checklists() -> int:
+    async for db in get_session():
+        if await db.scalar(select(func.count()).select_from(ChecklistTemplate)):
+            return 0
+        for stage_type, title, items in CHECKLISTS:
+            template = ChecklistTemplate(stage_type=stage_type, title=title)
+            db.add(template)
+            await db.flush()
+            for seq, (item, angle, required) in enumerate(items, start=1):
+                db.add(
+                    ChecklistItem(
+                        template_id=template.id,
+                        seq=seq,
+                        title=item,
+                        required_angle=angle,
+                        photo_required=required,
+                    )
+                )
+        await db.commit()
+    return len(CHECKLISTS)
+
+
 async def main() -> None:
     added = await seed_catalog()
     print(f"Справочник расценок: добавлено {added} позиций")  # noqa: T201
+    added = await seed_checklists()
+    print(f"Чек-листы: добавлено {added} шаблонов")  # noqa: T201
     await get_engine().dispose()
 
 

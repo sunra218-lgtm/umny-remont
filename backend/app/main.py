@@ -13,8 +13,10 @@ from app.modules.admin.router import router as admin_router
 from app.modules.auth.links import router as links_router
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_router
+from app.modules.checklists.router import router as checklists_router
 from app.modules.estimates.router import router as estimates_router
 from app.modules.field.router import router as field_router
+from app.modules.inspections.router import router as inspections_router
 from app.modules.me.router import router as me_router
 from app.modules.objects.router import router as objects_router
 from app.modules.orgs.router import router as orgs_router
@@ -55,6 +57,8 @@ def create_app() -> FastAPI:
     api.include_router(estimates_router)
     api.include_router(catalog_router)
     api.include_router(field_router)
+    api.include_router(checklists_router)
+    api.include_router(inspections_router)
 
     @api.get("/health", tags=["system"], summary="Проверка работоспособности")
     async def health() -> dict[str, str]:

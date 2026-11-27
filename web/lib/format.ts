@@ -126,3 +126,40 @@ export const FRAUD_FLAG_LABELS: Record<string, string> = {
   duplicate_exact: "Такое фото уже было",
   duplicate_similar: "Похоже на прежнее фото",
 };
+
+export const STAGE_STATUS_LABELS: Record<string, string> = {
+  planned: "Запланирован",
+  funding: "Ждёт резерва",
+  ready: "Готов к работе",
+  in_progress: "Идут работы",
+  inspection: "На проверке технадзора",
+  acceptance: "На приёмке у заказчика",
+  accepted: "Принят",
+  paid: "Оплачен",
+  frozen: "Заморожен (спор)",
+};
+
+export const STAGE_TYPE_LABELS: Record<string, string> = {
+  demolition: "Демонтаж",
+  walls: "Перегородки и штукатурка",
+  electric: "Электрика",
+  plumbing: "Сантехника",
+  screed: "Стяжка пола",
+  waterproofing: "Гидроизоляция",
+  tiling: "Плитка",
+  finishing: "Чистовая отделка",
+  ceiling: "Потолки",
+  doors: "Двери",
+};
+
+export const INSPECTION_RESULT_LABELS: Record<string, string> = {
+  passed: "Принято",
+  remarks: "Есть замечания",
+  failed: "Не принято",
+};
+
+export const REVIEW_LABELS: Record<string, string> = {
+  pending: "Не проверено",
+  approved: "Фото принято",
+  rejected: "Фото отклонено",
+};
