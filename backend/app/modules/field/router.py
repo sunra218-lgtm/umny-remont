@@ -1,5 +1,6 @@
 """Фотоотчёты бригады: код съёмки, загрузка с подписью устройства, лента объекта."""
 
+import asyncio
 import hashlib
 import secrets
 import uuid
@@ -188,7 +189,8 @@ async def upload_media(
     if len(data) > s.max_photo_bytes:
         raise Problem(413, "file-too-large", "Фото слишком большое")
     try:
-        info = inspect_image(data)
+        # Разбор фото занимает процессор: в отдельном потоке, чтобы не задерживать других.
+        info = await asyncio.to_thread(inspect_image, data)
     except NotAnImage as exc:
         raise Problem(422, "not-an-image", str(exc)) from None
     sha256 = hashlib.sha256(data).hexdigest()

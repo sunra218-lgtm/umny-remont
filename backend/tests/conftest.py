@@ -7,6 +7,7 @@ os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
 os.environ["ENV"] = "test"
 os.environ["OTP_DEBUG"] = "true"
 os.environ["BOOTSTRAP_ADMIN_PHONES"] = "+79990000001"
+os.environ["RATE_LIMIT_PER_MINUTE"] = "0"
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402

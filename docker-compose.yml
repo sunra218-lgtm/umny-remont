@@ -43,6 +43,12 @@ services:
       # Фото лежат в томе media. На сервере — S3-совместимое хранилище (см. .env.example).
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /data/media
+      # Доверяем X-Forwarded-For только от контейнеров своей сети (сайт проксирует API):
+      # иначе все запросы выглядели бы как пришедшие с адреса сайта.
+      FORWARDED_ALLOW_IPS: 172.28.0.0/16
+      # Локально API идёт через сайт, и все запросы приходят с одного адреса — лимит по IP выключен.
+      # На сервере (deploy/) API принимает Caddy напрямую, и лимит работает по адресу человека.
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-0}
     volumes:
       - media:/data/media
     ports:
@@ -84,6 +90,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
 
 volumes:
   pgdata:
