@@ -115,3 +115,14 @@ export const ASSIGNMENT_LABELS: Record<string, string> = {
 export function personName(p: { full_name: string | null; phone: string }): string {
   return p.full_name || formatPhone(p.phone);
 }
+
+export const FRAUD_FLAG_LABELS: Record<string, string> = {
+  no_challenge: "Без кода съёмки",
+  challenge_reused: "Код использован повторно",
+  challenge_expired: "Код просрочен",
+  delayed_upload: "Отправлено позже (не было связи)",
+  geo_mismatch: "Снято далеко от объекта",
+  no_geo: "Без геолокации",
+  duplicate_exact: "Такое фото уже было",
+  duplicate_similar: "Похоже на прежнее фото",
+};

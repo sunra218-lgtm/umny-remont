@@ -176,3 +176,27 @@ export type PriceItem = {
   sku: string | null;
   is_active: boolean;
 };
+
+export type MediaItem = {
+  id: string;
+  object_id: string;
+  stage_id: string | null;
+  stage_title: string | null;
+  author_name: string | null;
+  received_server_at: string;
+  captured_client_at: string | null;
+  review_status: string;
+  fraud_flags: Record<string, unknown> | null;
+  url: string;
+};
+
+export type OrgDevice = {
+  id: string;
+  user_id: string;
+  phone: string;
+  full_name: string | null;
+  kind: "web" | "lite";
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string;
+};

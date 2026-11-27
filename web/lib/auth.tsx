@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { api, hasAccessToken, refreshSession, setAccessToken } from "./api";
@@ -19,8 +19,15 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  // Приложение бригады (/l/…, /lite) входит по ключу телефона и ведёт сеанс само.
+  const pathname = usePathname();
+  const isLite = pathname.startsWith("/lite") || pathname.startsWith("/l/");
 
   const reload = useCallback(async () => {
+    if (isLite) {
+      setLoading(false);
+      return;
+    }
     try {
       if (!hasAccessToken() && !(await refreshSession())) {
         setMe(null);
@@ -32,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLite]);
 
   useEffect(() => {
     void reload();

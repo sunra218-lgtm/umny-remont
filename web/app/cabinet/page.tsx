@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { describeDevice, formatDate, formatPhone, ORG_TYPE_LABELS, ROLE_LABELS } from "@/lib/format";
-import type { Device } from "@/lib/types";
+import type { Device, Me, OrgDevice } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
@@ -121,6 +121,12 @@ export default function CabinetPage() {
         </ul>
       </section>
 
+      {me.memberships
+        .filter((m) => m.role === "contractor_admin")
+        .map((m) => (
+          <TeamDevices key={m.org_id} orgId={m.org_id} orgName={m.org_name} me={me} />
+        ))}
+
       <section className="card">
         <h2>Согласия</h2>
         <ul className="list">
@@ -141,5 +147,60 @@ export default function CabinetPage() {
         </ul>
       </section>
     </Shell>
+  );
+}
+
+/** Руководитель видит телефоны сотрудников и может отключить потерянный или чужой. */
+function TeamDevices({ orgId, orgName, me }: { orgId: string; orgName: string; me: Me }) {
+  const [devices, setDevices] = useState<OrgDevice[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setDevices(await api<OrgDevice[]>(`/organizations/${orgId}/devices`));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [orgId]);
+  useEffect(() => void load(), [load]);
+
+  async function revoke(id: string) {
+    setError(null);
+    try {
+      await api(`/auth/devices/${id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  const others = devices?.filter((d) => d.user_id !== me.id) ?? [];
+  return (
+    <section className="card">
+      <h2>Где вошли сотрудники · {orgName}</h2>
+      {devices === null ? (
+        error ? null : <Loading />
+      ) : others.length === 0 ? (
+        <p className="muted">Сотрудники пока не входили. Прорабу отправьте ссылку для входа со страницы объекта.</p>
+      ) : (
+        <ul className="list">
+          {others.map((d) => (
+            <li key={d.id}>
+              <div>
+                <b>{d.full_name ?? formatPhone(d.phone)}</b>
+                {d.kind === "lite" && <span className="badge">Приложение бригады</span>}
+                <div className="muted">
+                  {describeDevice(d.user_agent)} · последний вход {formatDate(d.last_seen_at)}
+                </div>
+              </div>
+              <button type="button" className="secondary small" onClick={() => void revoke(d.id)}>
+                Завершить сеанс
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ErrorNote text={error} />
+    </section>
   );
 }

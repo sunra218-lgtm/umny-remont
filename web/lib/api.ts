@@ -20,6 +20,12 @@ export class ApiError extends Error {
 
 let accessToken: string | null = null;
 let refreshing: Promise<boolean> | null = null;
+// Приложение бригады подписывает продление сеанса ключом телефона.
+let deviceSigner: (() => Promise<Record<string, string>>) | null = null;
+
+export function setDeviceSigner(signer: (() => Promise<Record<string, string>>) | null) {
+  deviceSigner = signer;
+}
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
@@ -41,7 +47,8 @@ export async function refreshSession(): Promise<boolean> {
   if (!refreshing) {
     refreshing = (async () => {
       try {
-        const resp = await fetch("/api/v1/auth/refresh", { method: "POST", credentials: "same-origin" });
+        const headers = deviceSigner ? await deviceSigner() : {};
+        const resp = await fetch("/api/v1/auth/refresh", { method: "POST", credentials: "same-origin", headers });
         if (!resp.ok) {
           accessToken = null;
           return false;
@@ -59,14 +66,16 @@ export async function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-type Options = { method?: string; body?: unknown; form?: FormData; retry?: boolean };
+type Options = { method?: string; body?: unknown; form?: FormData; retry?: boolean; idempotencyKey?: string };
 
-export async function api<T>(path: string, { method = "GET", body, form, retry = true }: Options = {}): Promise<T> {
+export async function api<T>(path: string, options: Options = {}): Promise<T> {
+  const { body, form, retry = true, idempotencyKey } = options;
+  let { method = "GET" } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (form) method = method === "GET" ? "POST" : method;
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  if (method !== "GET") headers["Idempotency-Key"] = crypto.randomUUID();
+  if (method !== "GET") headers["Idempotency-Key"] = idempotencyKey ?? crypto.randomUUID();
 
   let resp: Response;
   try {
@@ -86,7 +95,7 @@ export async function api<T>(path: string, { method = "GET", body, form, retry =
   }
 
   if (resp.status === 401 && retry && !path.startsWith("/auth/")) {
-    if (await refreshSession()) return api<T>(path, { method, body, form, retry: false });
+    if (await refreshSession()) return api<T>(path, { ...options, method, retry: false });
   }
   if (!resp.ok) throw new ApiError(await parseProblem(resp));
   if (resp.status === 204) return undefined as T;

@@ -39,6 +39,11 @@ services:
       ENV: ${ENV:-dev}
       OTP_DEBUG: ${OTP_DEBUG:-true}
       BOOTSTRAP_ADMIN_PHONES: ${BOOTSTRAP_ADMIN_PHONES:-+79990000001}
+      # Фото лежат в томе media. На сервере — S3-совместимое хранилище (см. .env.example).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: /data/media
+    volumes:
+      - media:/data/media
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -65,3 +70,4 @@ services:
 
 volumes:
   pgdata:
+  media:
