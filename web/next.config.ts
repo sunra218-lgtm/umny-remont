@@ -10,7 +10,8 @@ const csp = [
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
-  "media-src 'self' blob:",
+  // Ролики дизайн-проекта отдаёт внешний контент-завод (только https).
+  "media-src 'self' blob: https:",
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
