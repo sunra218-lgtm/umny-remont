@@ -12,6 +12,7 @@ from app.models.enums import (
     ObjectStatus,
     PaymentStatus,
     PurchaseOrderStatus,
+    ServiceOrderStatus,
     StageStatus,
 )
 
@@ -79,12 +80,23 @@ PURCHASE_ORDER_TRANSITIONS: dict[StrEnum, set[StrEnum]] = {
     _PO.rejected: set(),
 }
 
+_SO = ServiceOrderStatus
+SERVICE_ORDER_TRANSITIONS: dict[StrEnum, set[StrEnum]] = {
+    _SO.created: {_SO.scheduled, _SO.cancelled},
+    # Перенос времени выезда — повторное назначение в том же статусе.
+    _SO.scheduled: {_SO.scheduled, _SO.paid, _SO.cancelled},
+    _SO.paid: {_SO.paid, _SO.completed, _SO.cancelled},
+    _SO.completed: set(),
+    _SO.cancelled: set(),
+}
+
 TRANSITIONS: dict[str, dict[StrEnum, set[StrEnum]]] = {
     "object": OBJECT_TRANSITIONS,
     "stage": STAGE_TRANSITIONS,
     "act": ACT_TRANSITIONS,
     "payment": PAYMENT_TRANSITIONS,
     "purchase_order": PURCHASE_ORDER_TRANSITIONS,
+    "service_order": SERVICE_ORDER_TRANSITIONS,
 }
 
 

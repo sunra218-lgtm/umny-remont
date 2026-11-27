@@ -74,3 +74,105 @@ export type AuditEntry = {
 };
 
 export type Page<T> = { items: T[]; next_cursor: string | null };
+
+export type ObjectStatus =
+  | "draft"
+  | "survey"
+  | "estimating"
+  | "contracting"
+  | "active"
+  | "dispute"
+  | "completed"
+  | "cancelled";
+
+export type Person = { id: string; phone: string; full_name: string | null };
+
+export type RepairObject = {
+  id: string;
+  status: ObjectStatus;
+  address_text: string;
+  area_m2: string | null;
+  customer: Person | null;
+  contractor_org_id: string | null;
+  contractor_name: string | null;
+  created_at: string;
+  access: {
+    is_customer: boolean;
+    is_admin: boolean;
+    can_edit_estimates: boolean;
+    can_manage_team: boolean;
+    can_order_services: boolean;
+  };
+};
+
+export type Assignment = { id: string; role: "foreman" | "inspector" | "procurement_manager"; user: Person; created_at: string };
+
+export type Stage = {
+  id: string;
+  seq: number;
+  title: string;
+  stage_type: string | null;
+  is_stop_point: boolean;
+  planned_start: string | null;
+  planned_end: string | null;
+  work_budget_kop: number;
+  material_budget_kop: number;
+  status: string;
+};
+
+export type ServiceOrder = {
+  id: string;
+  object_id: string;
+  type: "acceptance" | "survey";
+  status: "created" | "scheduled" | "paid" | "completed" | "cancelled";
+  price_kop: number;
+  slot_at: string | null;
+  paid_at: string | null;
+  completed_at: string | null;
+  customer_comment: string | null;
+  result_notes: string | null;
+  inspector: Person | null;
+  created_at: string;
+};
+
+export type EstimateSummary = {
+  id: string;
+  object_id: string;
+  type: "preliminary" | "full";
+  version: number;
+  total_work_kop: number;
+  total_material_kop: number;
+  reserve_kop: number;
+  total_kop: number;
+  status: "draft" | "submitted" | "approved";
+  created_at: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+};
+
+export type EstimateItem = {
+  id: string;
+  seq: number;
+  stage_id: string | null;
+  room: string | null;
+  category: "work" | "material";
+  title: string;
+  unit: string;
+  qty: string;
+  unit_price_kop: number;
+  total_kop: number;
+  price_item_id: string | null;
+};
+
+export type Estimate = EstimateSummary & { items: EstimateItem[]; can_edit: boolean; can_approve: boolean };
+
+export type PriceItem = {
+  id: string;
+  category: "work" | "material";
+  stage_type: string | null;
+  title: string;
+  unit: string;
+  unit_price_kop: number;
+  sku: string | null;
+  is_active: boolean;
+};

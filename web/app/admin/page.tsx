@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import { formatDate, formatPhone, ORG_TYPE_LABELS, ROLE_LABELS, ROLES_BY_ORG_TYPE } from "@/lib/format";
-import type { AdminUser, AuditEntry, Member, Org, OrgRole, OrgType, Page } from "@/lib/types";
+import { formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub } from "@/lib/format";
+import type { AdminUser, AuditEntry, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
-type Tab = "orgs" | "users" | "audit";
+type Tab = "orgs" | "catalog" | "users" | "audit";
 
 export default function AdminPage() {
   const { me, loading } = useRequireAuth({ admin: true });
@@ -22,6 +22,7 @@ export default function AdminPage() {
         {(
           [
             ["orgs", "Организации"],
+            ["catalog", "Справочник расценок"],
             ["users", "Пользователи"],
             ["audit", "Журнал действий"],
           ] as [Tab, string][]
@@ -32,6 +33,7 @@ export default function AdminPage() {
         ))}
       </div>
       {tab === "orgs" && <OrgsTab />}
+      {tab === "catalog" && <CatalogTab />}
       {tab === "users" && <UsersTab />}
       {tab === "audit" && <AuditTab />}
     </Shell>
@@ -369,6 +371,32 @@ const ACTION_LABELS: Record<string, string> = {
   "consent.granted.pd_processing": "Согласие на обработку ПДн",
   "consent.granted.marketing": "Согласие на рассылки",
   "consent.revoked.marketing": "Отзыв согласия на рассылки",
+  "object.created": "Добавлен объект",
+  "object.updated": "Изменён объект",
+  "object.cancelled": "Объект отменён",
+  "object.status_changed": "Сменился статус объекта",
+  "object.contractor_set": "Назначен подрядчик",
+  "object.assignment_added": "Назначен сотрудник на объект",
+  "object.assignment_removed": "Сотрудник снят с объекта",
+  "service_order.created": "Заказан выезд",
+  "service_order.scheduled": "Выезд назначен",
+  "service_order.paid": "Выезд оплачен",
+  "service_order.completed": "Выезд выполнен",
+  "service_order.cancelled": "Выезд отменён",
+  "stage.created": "Добавлен этап",
+  "stage.updated": "Изменён этап",
+  "stage.deleted": "Удалён этап",
+  "estimate.created": "Создана версия сметы",
+  "estimate.updated": "Изменён резерв сметы",
+  "estimate.deleted": "Удалён черновик сметы",
+  "estimate.item_added": "Добавлена позиция сметы",
+  "estimate.item_updated": "Изменена позиция сметы",
+  "estimate.item_deleted": "Удалена позиция сметы",
+  "estimate.imported": "Смета загружена из Excel",
+  "estimate.submitted": "Смета отправлена заказчику",
+  "estimate.approved": "Смета утверждена заказчиком",
+  "price_item.created": "Добавлена расценка",
+  "price_item.updated": "Изменена расценка",
 };
 
 function AuditTab() {
@@ -421,6 +449,126 @@ function AuditTab() {
         <button className="secondary" onClick={() => void load(cursor)}>
           Показать ещё
         </button>
+      )}
+    </section>
+  );
+}
+
+const EMPTY_PRICE = { category: "work", stage_type: "", title: "", unit: "", price: "" };
+
+function CatalogTab() {
+  const [items, setItems] = useState<PriceItem[] | null>(null);
+  const [form, setForm] = useState(EMPTY_PRICE);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setItems(await api<PriceItem[]>("/price-items?include_inactive=true"));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, []);
+  useEffect(() => void load(), [load]);
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api("/price-items", {
+        method: "POST",
+        body: {
+          category: form.category,
+          stage_type: form.stage_type.trim() || null,
+          title: form.title,
+          unit: form.unit,
+          unit_price_kop: parseRub(form.price),
+        },
+      });
+      setForm(EMPTY_PRICE);
+      await load();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  async function patch(item: PriceItem, body: Record<string, unknown>) {
+    setError(null);
+    try {
+      await api(`/price-items/${item.id}`, { method: "PATCH", body });
+      await load();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  return (
+    <section className="card">
+      <p className="muted">Расценки, из которых сметчики собирают сметы. Изменение цены не меняет уже составленные сметы.</p>
+      <form onSubmit={add} className="grid2 boxed">
+        <div>
+          <label htmlFor="p-title">Наименование</label>
+          <input id="p-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </div>
+        <div>
+          <label htmlFor="p-cat">Тип</label>
+          <select id="p-cat" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            <option value="work">Работа</option>
+            <option value="material">Материал</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="p-stage">Вид этапа</label>
+          <input id="p-stage" value={form.stage_type} onChange={(e) => setForm({ ...form, stage_type: e.target.value })} placeholder="electric, tiling…" />
+        </div>
+        <div>
+          <label htmlFor="p-unit">Единица</label>
+          <input id="p-unit" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="м²" />
+        </div>
+        <div>
+          <label htmlFor="p-price">Цена, ₽</label>
+          <input id="p-price" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+        </div>
+        <div className="row end">
+          <button type="submit" className="primary" disabled={!form.title || !form.unit || parseRub(form.price) === null}>
+            Добавить расценку
+          </button>
+        </div>
+      </form>
+      <ErrorNote text={error} />
+      {items === null ? (
+        <Loading />
+      ) : items.length === 0 ? (
+        <p className="empty muted">Справочник пуст. Добавьте первую расценку.</p>
+      ) : (
+        <div className="table-wrap"><table>
+          <thead>
+            <tr>
+              <th>Наименование</th>
+              <th>Вид этапа</th>
+              <th className="num">Цена</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id} style={p.is_active ? undefined : { opacity: 0.55 }}>
+                <td>
+                  {p.title}
+                  {p.category === "material" && <span className="badge">материал</span>}
+                </td>
+                <td className="muted">{p.stage_type ?? "—"}</td>
+                <td className="num">
+                  {rub(p.unit_price_kop)} / {p.unit}
+                </td>
+                <td className="end">
+                  <button className="secondary small" onClick={() => void patch(p, { is_active: !p.is_active })}>
+                    {p.is_active ? "Скрыть" : "Вернуть"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
       )}
     </section>
   );

@@ -9,7 +9,7 @@ export default function Home() {
   const { me, loading } = useAuth();
   const router = useRouter();
   useEffect(() => {
-    if (!loading) router.replace(me ? (me.is_platform_admin ? "/admin" : "/cabinet") : "/login");
+    if (!loading) router.replace(me ? (me.is_platform_admin ? "/admin" : "/objects") : "/login");
   }, [loading, me, router]);
   return null;
 }

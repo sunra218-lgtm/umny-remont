@@ -26,7 +26,7 @@ export default function LoginPage() {
   const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
-    if (!loading && me) router.replace(me.is_platform_admin ? "/admin" : "/cabinet");
+    if (!loading && me) router.replace(me.is_platform_admin ? "/admin" : "/objects");
   }, [loading, me, router]);
 
   useEffect(() => {
