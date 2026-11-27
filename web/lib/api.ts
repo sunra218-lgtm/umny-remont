@@ -102,6 +102,22 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   return (await resp.json()) as T;
 }
 
+/** Скачивание файла из API (отчёты): с тем же входом, что и обычные запросы. */
+export async function download(path: string, retry = true): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const resp = await fetch(`/api/v1${path}`, { headers, credentials: "same-origin" });
+  if (resp.status === 401 && retry && (await refreshSession())) return download(path, false);
+  if (!resp.ok) throw new ApiError(await parseProblem(resp));
+  const name = /filename="([^"]+)"/.exec(resp.headers.get("content-disposition") ?? "")?.[1] ?? "report.csv";
+  const url = URL.createObjectURL(await resp.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function errorText(err: unknown): string {
   if (err instanceof ApiError) {
     const p = err.problem;

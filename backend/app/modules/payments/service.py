@@ -63,7 +63,11 @@ async def apply_event(
         await db.get(Stage, payment.stage_id, with_for_update=True) if payment.stage_id else None
     )
     payload = dict(payment.bank_payload or {})
+    if any(e.get("id") == event.event_id for e in payload.get("events", [])):
+        return payment  # то же уведомление пришло повторно
     payload.setdefault("events", []).append({"id": event.event_id, "status": event.status})
+    if event.store:
+        payload["bank"] = {**payload.get("bank", {}), **event.store}
 
     if event.status == "held" and payment.status == PaymentStatus.pending_funding:
         _set(db, "payment", payment, PaymentStatus.held, "payment.held", actor)
@@ -206,7 +210,12 @@ async def request_release(db: AsyncSession, act: Act, actor: uuid.UUID | None) -
     contractor = await db.get(Organization, obj.contractor_org_id)
     assert contractor is not None
     recipients = [
-        Recipient("contractor", contractor.inn, act.work_kop + act.material_kop),
+        Recipient(
+            "contractor",
+            contractor.inn,
+            act.work_kop + act.material_kop,
+            contractor.bank_partner_id,
+        ),
     ]
     fee = int(breakdown.get("platform_fee_kop", 0))
     if fee:
@@ -220,7 +229,7 @@ async def request_release(db: AsyncSession, act: Act, actor: uuid.UUID | None) -
             "Обратитесь к администратору.",
         )
     payment.act_id = act.id
-    payment.split = {**payment.split, "recipients": [r.__dict__ for r in recipients]}
+    payment.split = {**payment.split, "recipients": [r.public() for r in recipients]}
     _set(
         db,
         "payment",
@@ -231,5 +240,5 @@ async def request_release(db: AsyncSession, act: Act, actor: uuid.UUID | None) -
         act_id=act.id,
     )
     await db.flush()
-    await run(db, await get_bank().release(payment.id, recipients), actor)
+    await run(db, await get_bank().release(payment, recipients), actor)
     return payment

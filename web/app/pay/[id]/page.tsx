@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api, errorText } from "@/lib/api";
@@ -14,10 +14,14 @@ function backUrl(p: Payment): string {
   return p.purchase_order_id ? `/objects/${p.object_id}#materials` : `/stages/${p.stage_id}`;
 }
 
-/** Тестовая страница оплаты: так выглядит переход в банк, пока настоящий банк не подключён. */
-export default function FakePayPage() {
+/**
+ * Сюда заказчик возвращается из банка (?result=success|fail): ждём уведомление банка и ведём назад.
+ * Без параметра — тестовая страница оплаты, пока настоящий банк не подключён.
+ */
+export default function PayPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const result = useSearchParams().get("result");
   const { me, loading } = useRequireAuth();
   const [payment, setPayment] = useState<Payment | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +30,26 @@ export default function FakePayPage() {
   useEffect(() => {
     if (me) api<Payment>(`/payments/${id}`).then(setPayment).catch((err) => setError(errorText(err)));
   }, [me, id]);
+
+  // Банк сообщает об оплате отдельно, обычно за несколько секунд: проверяем до двух минут.
+  const waiting = result !== null && payment?.status === "pending_funding";
+  useEffect(() => {
+    if (!waiting) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (tries > 40) return clearInterval(timer);
+      api<Payment>(`/payments/${id}`)
+        .then((p) => {
+          if (p.status !== "pending_funding") {
+            clearInterval(timer);
+            router.replace(backUrl(p));
+          }
+        })
+        .catch(() => undefined);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [waiting, id, router]);
 
   async function pay(success: boolean) {
     setBusy(true);
@@ -43,7 +67,7 @@ export default function FakePayPage() {
   return (
     <Shell>
       <h1>Оплата резерва</h1>
-      <p className="devnote">Тестовый режим: банк ещё не подключён, деньги не списываются.</p>
+      {result === null && <p className="devnote">Тестовый режим: банк ещё не подключён, деньги не списываются.</p>}
       {!payment ? (
         error ? <ErrorNote text={error} /> : <Loading />
       ) : (
@@ -52,7 +76,14 @@ export default function FakePayPage() {
           <h2>
             {payment.purchase_order_id ? "Материалы для ремонта" : `Этап «${payment.stage_title}»`}: {rub(payment.amount_kop)}
           </h2>
-          {payment.status === "pending_funding" ? (
+          {waiting ? (
+            <p>
+              {result === "fail"
+                ? "Банк сообщил, что оплата не прошла. Можно вернуться и оплатить ещё раз."
+                : "Ждём подтверждение от банка, обычно это несколько секунд."}{" "}
+              <a href={backUrl(payment)}>{payment.purchase_order_id ? "Вернуться к объекту" : "Вернуться к этапу"}</a>
+            </p>
+          ) : payment.status === "pending_funding" ? (
             <div className="row">
               <button className="primary" disabled={busy} onClick={() => void pay(true)}>
                 Оплатить {rub(payment.amount_kop)}

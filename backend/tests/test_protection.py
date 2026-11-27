@@ -129,6 +129,16 @@ async def test_pilot_kpi(client: AsyncClient, admin: dict[str, str], engine, mon
     assert "имитация" in m["cycles"]["note"]
     assert m["baskets"]["value"] == 0
 
+    # Выгрузка для таблицы: тот же отчёт, открывается в Excel.
+    assert (await client.get("/api/v1/admin/kpi.csv", headers=w.customer)).status_code == 403
+    csv = await client.get("/api/v1/admin/kpi.csv", headers=admin)
+    assert csv.status_code == 200 and csv.headers["content-type"].startswith("text/csv")
+    assert "attachment" in csv.headers["content-disposition"]
+    rows = csv.content.decode("utf-8-sig").splitlines()
+    assert rows[0].startswith("Отчёт пилота")
+    assert any(r.startswith("Пилотных объектов в работе;1;8;шт.;нет") for r in rows)
+    assert any(f";{len(work)};3;" in r and "в работе" in r for r in rows)
+
 
 def test_working_days() -> None:
     from datetime import date

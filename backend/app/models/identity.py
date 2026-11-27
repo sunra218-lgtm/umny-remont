@@ -56,6 +56,8 @@ class Organization(UUIDPk, Timestamps, SoftDelete, Base):
     legal_name: Mapped[str] = mapped_column(String(300), nullable=False)
     bank_bik: Mapped[str | None] = mapped_column(String(9))
     bank_account: Mapped[str | None] = mapped_column(String(20))
+    # Код получателя выплат в банке безопасной сделки (у Т-Банка — PartnerId).
+    bank_partner_id: Mapped[str | None] = mapped_column(String(64))
     rating: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
     sla_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

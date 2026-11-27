@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Request
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -17,7 +18,7 @@ from app.domain.statuses import ensure_transition
 from app.models import Act, Payment, Stage
 from app.models.enums import ObjectStatus, PaymentStatus, PaymentType, StageStatus
 from app.modules.payments import service
-from app.modules.payments.bank import BankEvent, get_bank, parse_webhook
+from app.modules.payments.bank import BankEvent, get_bank
 
 router = APIRouter(tags=["payments"])
 
@@ -178,20 +179,26 @@ async def fake_pay(
     return payment_out(payment, stage, access.obj.address_text)
 
 
-@router.post("/webhooks/bank", summary="Уведомление банка об операции")
-async def bank_webhook(request: Request, db: DbSession) -> dict[str, bool]:
+@router.post("/webhooks/bank", summary="Уведомление банка об операции", response_model=None)
+async def bank_webhook(request: Request, db: DbSession) -> Response | dict[str, bool]:
     body = await request.body()
-    event = parse_webhook(body, request.headers.get("x-bank-signature"))
-    if event is None:
+    parsed = get_bank().parse_webhook(body, request.headers)
+    if parsed is None:
         raise Problem(401, "bad-signature", "Подпись уведомления не прошла")
-    try:
-        await service.apply_event(db, event)
-    except Problem as exc:
-        if exc.status == 404:
-            return {"ok": False}
-        raise
-    await db.commit()
-    return {"ok": True}
+    ok = True
+    if parsed.event is not None:
+        try:
+            await service.apply_event(db, parsed.event)
+        except Problem as exc:
+            if exc.status != 404:
+                raise
+            ok = False
+        else:
+            await db.commit()
+    # Т-Банк ждёт ровно «OK», иначе повторяет уведомление; чужой платёж повторять незачем.
+    if parsed.reply:
+        return PlainTextResponse(parsed.reply)
+    return {"ok": ok}
 
 
 class ReleaseIn(BaseModel):

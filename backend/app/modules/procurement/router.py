@@ -827,7 +827,9 @@ async def _release(db: AsyncSession, order: PurchaseOrder, actor: uuid.UUID | No
     if order.supplier_org_id:
         supplier = await db.get(Organization, order.supplier_org_id)
         assert supplier is not None
-        recipients = [Recipient("supplier", supplier.inn, order.supplier_cost_kop)]
+        recipients = [
+            Recipient("supplier", supplier.inn, order.supplier_cost_kop, supplier.bank_partner_id)
+        ]
         margin = payment.amount_kop - order.supplier_cost_kop
         if margin:
             recipients.append(Recipient("platform", platform_inn, margin))
@@ -836,7 +838,7 @@ async def _release(db: AsyncSession, order: PurchaseOrder, actor: uuid.UUID | No
         recipients = [Recipient("platform", platform_inn, payment.amount_kop)]
     if sum(r.amount_kop for r in recipients) != payment.amount_kop:
         raise Problem(409, "split-mismatch", "Сумма выплат не совпадает с резервом")
-    payment.split = {**payment.split, "recipients": [r.__dict__ for r in recipients]}
+    payment.split = {**payment.split, "recipients": [r.public() for r in recipients]}
     payments._set(
         db,
         "payment",
@@ -847,7 +849,7 @@ async def _release(db: AsyncSession, order: PurchaseOrder, actor: uuid.UUID | No
         purchase_order_id=order.id,
     )
     await db.flush()
-    await payments.run(db, await get_bank().release(payment.id, recipients), actor)
+    await payments.run(db, await get_bank().release(payment, recipients), actor)
 
 
 async def _delivered(

@@ -38,6 +38,7 @@ export type Org = {
   legal_name: string;
   bank_bik: string | null;
   bank_account: string | null;
+  bank_partner_id?: string | null;
   verified_at: string | null;
   created_at: string;
 };
