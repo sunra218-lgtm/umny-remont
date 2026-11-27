@@ -8,6 +8,7 @@ import { formatDate, STAGE_STATUS_LABELS } from "@/lib/format";
 import { useLite } from "@/lib/lite";
 import type { Page, RepairObject, Stage, StageChecklist } from "@/lib/types";
 
+import { LiteMaterials } from "./materials";
 import { cacheGet, cacheSet, LiteGate } from "./parts";
 
 type ObjectWithStages = { obj: RepairObject; stages: Stage[] };
@@ -185,6 +186,7 @@ function Home() {
                 ))}
               </ul>
             )}
+            <LiteMaterials objectId={obj.id} stages={stages} online={online} />
           </section>
         ))
       )}

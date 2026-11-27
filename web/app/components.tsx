@@ -16,6 +16,9 @@ export function Header() {
         <nav className="topnav">
           <Link href="/objects">Объекты</Link>
           {(me.is_platform_admin || me.memberships.some((m) => m.role === "inspector")) && <Link href="/inspections">Выезды</Link>}
+          {(me.is_platform_admin || me.memberships.some((m) => m.role === "procurement_manager" || m.role === "supplier_manager")) && (
+            <Link href="/procurement">Закупки</Link>
+          )}
           <Link href="/cabinet">Кабинет</Link>
           {me.is_platform_admin && <Link href="/admin">Админка</Link>}
           <button type="button" className="link" onClick={() => void signOut().then(() => location.assign("/login"))}>

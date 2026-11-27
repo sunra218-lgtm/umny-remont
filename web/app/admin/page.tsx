@@ -1,15 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import { formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
-import type { AdminUser, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
+import { DISPUTE_OUTCOME_LABELS, DISPUTE_STATUS_LABELS, formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
+import type { AdminUser, Dispute, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
-type Tab = "orgs" | "catalog" | "checklists" | "users" | "audit";
+type Tab = "orgs" | "disputes" | "catalog" | "checklists" | "users" | "audit";
 
 export default function AdminPage() {
   const { me, loading } = useRequireAuth({ admin: true });
@@ -22,6 +23,7 @@ export default function AdminPage() {
         {(
           [
             ["orgs", "Организации"],
+            ["disputes", "Споры"],
             ["catalog", "Справочник расценок"],
             ["checklists", "Чек-листы фото"],
             ["users", "Пользователи"],
@@ -34,6 +36,7 @@ export default function AdminPage() {
         ))}
       </div>
       {tab === "orgs" && <OrgsTab />}
+      {tab === "disputes" && <DisputesTab />}
       {tab === "catalog" && <CatalogTab />}
       {tab === "checklists" && <ChecklistsTab />}
       {tab === "users" && <UsersTab />}
@@ -723,6 +726,56 @@ function ChecklistsTab() {
           )}
           <ErrorNote text={error} />
         </>
+      )}
+    </section>
+  );
+}
+
+function DisputesTab() {
+  const [items, setItems] = useState<Dispute[] | null>(null);
+  const [all, setAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api<Dispute[]>(`/disputes?open_only=${!all}`)
+      .then(setItems)
+      .catch((err) => setError(errorText(err)));
+  }, [all]);
+  return (
+    <section className="card">
+      <div className="row between">
+        <h2>Споры</h2>
+        <label className="check">
+          <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
+          Показать закрытые
+        </label>
+      </div>
+      <ErrorNote text={error} />
+      {items === null ? (
+        <Loading />
+      ) : items.length === 0 ? (
+        <p className="muted">{all ? "Споров ещё не было." : "Открытых споров нет."}</p>
+      ) : (
+        <ul className="list">
+          {items.map((d) => (
+            <li key={d.id}>
+              <div>
+                <b>
+                  {d.address}, этап «{d.stage_title}»
+                </b>
+                <div className="muted small">
+                  {DISPUTE_STATUS_LABELS[d.status]} · {d.opened_by_name}, {formatDate(d.created_at)}
+                  {d.outcome ? ` · ${DISPUTE_OUTCOME_LABELS[d.outcome]}` : ""}
+                </div>
+                <div className="small">{d.reason}</div>
+              </div>
+              {d.stage_id && (
+                <Link className="button secondary" href={`/stages/${d.stage_id}`}>
+                  {d.status === "open" || d.status === "in_review" ? "Разобрать" : "Открыть"}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

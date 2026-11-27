@@ -15,6 +15,7 @@ from app.modules.auth.links import router as links_router
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_router
 from app.modules.checklists.router import router as checklists_router
+from app.modules.disputes.router import router as disputes_router
 from app.modules.estimates.router import router as estimates_router
 from app.modules.field.router import router as field_router
 from app.modules.inspections.router import router as inspections_router
@@ -22,6 +23,7 @@ from app.modules.me.router import router as me_router
 from app.modules.objects.router import router as objects_router
 from app.modules.orgs.router import router as orgs_router
 from app.modules.payments.router import router as payments_router
+from app.modules.procurement.router import router as procurement_router
 from app.modules.services.router import router as services_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -63,6 +65,8 @@ def create_app() -> FastAPI:
     api.include_router(inspections_router)
     api.include_router(payments_router)
     api.include_router(acts_router)
+    api.include_router(disputes_router)
+    api.include_router(procurement_router)
 
     @api.get("/health", tags=["system"], summary="Проверка работоспособности")
     async def health() -> dict[str, str]:

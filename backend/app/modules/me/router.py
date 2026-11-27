@@ -9,9 +9,10 @@ from app.core.audit import audit
 from app.core.deps import Auth, CurrentUser, DbSession, client_ip
 from app.core.problems import Problem
 from app.core.security import utcnow
-from app.models import Consent
+from app.models import Consent, Notification
 from app.models.enums import ConsentType, OrgRole, OrgType
 from app.modules.auth import service as auth_service
+from app.modules.notifications.service import TEMPLATES, render
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -142,3 +143,29 @@ async def revoke(
         )
     await db.commit()
     return await _me_out(current, db)
+
+
+class NotificationOut(BaseModel):
+    id: uuid.UUID
+    text: str
+    status: str
+    created_at: datetime
+
+
+@router.get("/notifications", response_model=list[NotificationOut], summary="Мои уведомления")
+async def my_notifications(current: Auth, db: DbSession) -> list[NotificationOut]:
+    rows = await db.execute(
+        select(Notification)
+        .where(Notification.user_id == current.id)
+        .order_by(Notification.created_at.desc())
+        .limit(30)
+    )
+    return [
+        NotificationOut(
+            id=n.id,
+            text=render(n.template, n.payload) if n.template in TEMPLATES else n.template,
+            status=n.status,
+            created_at=n.created_at,
+        )
+        for n in rows.scalars()
+    ]
