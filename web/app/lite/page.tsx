@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { api, errorText } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { formatDate, STAGE_STATUS_LABELS } from "@/lib/format";
 import { useLite } from "@/lib/lite";
-import type { Page, RepairObject, Stage } from "@/lib/types";
+import type { Page, RepairObject, Stage, StageChecklist } from "@/lib/types";
 
 import { cacheGet, cacheSet, LiteGate } from "./parts";
 
@@ -24,6 +24,8 @@ function Home() {
   const { me, queue, online, sync, syncing } = useLite();
   const [data, setData] = useState<ObjectWithStages[] | null>(() => cacheGet("lite:objects"));
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ stage: Stage; missing: string[] } | null>(null);
 
   useEffect(() => {
     if (!me) return;
@@ -42,6 +44,45 @@ function Home() {
       }
     })();
   }, [me]);
+
+  async function act(stage: Stage, action: "start" | "submit") {
+    setError(null);
+    setNote(null);
+    try {
+      const out = await api<Stage | { stage: Stage; missing: string[] }>(`/stages/${stage.id}/${action}`, { method: "POST" });
+      const updated = "stage" in out ? out.stage : out;
+      const missing = "missing" in out ? out.missing : [];
+      setData((rows) => {
+        const next = rows?.map((r) => ({ ...r, stages: r.stages.map((s) => (s.id === updated.id ? updated : s)) })) ?? null;
+        cacheSet("lite:objects", next);
+        return next;
+      });
+      setNote(
+        action === "start"
+          ? `«${stage.title}»: работы начаты.`
+          : `«${stage.title}» сдан${missing.length ? `. Не хватает фото: ${missing.join(", ")}` : ""}.`,
+      );
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  async function trySubmit(stage: Stage) {
+    setError(null);
+    setNote(null);
+    try {
+      const c = await api<StageChecklist>(`/stages/${stage.id}/checklist`);
+      const missing = c.items.filter((i) => c.missing.includes(i.id)).map((i) => i.title);
+      const waiting = queue.some((q) => q.stageId === stage.id);
+      if (missing.length || waiting) {
+        setConfirm({ stage, missing: waiting ? [...missing, "часть фото ещё не отправлена"] : missing });
+        return;
+      }
+      await act(stage, "submit");
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
 
   const failed = queue.filter((q) => q.error);
   return (
@@ -70,6 +111,33 @@ function Home() {
           {error}
         </p>
       )}
+      {note && (
+        <p className="ok" role="status">
+          {note}
+        </p>
+      )}
+      {confirm && (
+        <section className="card" role="alertdialog" aria-labelledby="confirm-title">
+          <h2 id="confirm-title">Сдать «{confirm.stage.title}»?</h2>
+          <p>Не хватает: {confirm.missing.join(", ")}. Проверяющий это увидит.</p>
+          <div className="row">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                const st = confirm.stage;
+                setConfirm(null);
+                void act(st, "submit");
+              }}
+            >
+              Сдать без этих фото
+            </button>
+            <button type="button" className="secondary" onClick={() => setConfirm(null)}>
+              Доснять фото
+            </button>
+          </div>
+        </section>
+      )}
       {data === null ? (
         <div className="skeleton" aria-busy="true" aria-label="Загрузка" />
       ) : data.length === 0 ? (
@@ -90,14 +158,29 @@ function Home() {
                       <b>
                         {s.seq}. {s.title}
                       </b>
-                      {s.is_stop_point && <div className="muted">Стоп-точка: нужна приёмка</div>}
+                      <div className="muted small">
+                        {STAGE_STATUS_LABELS[s.status] ?? s.status}
+                        {s.is_stop_point && " · проверка технадзора"}
+                      </div>
                     </div>
-                    <Link
-                      className="button primary"
-                      href={`/lite/capture?stage=${s.id}&title=${encodeURIComponent(s.title)}&address=${encodeURIComponent(obj.address_text)}`}
-                    >
-                      Снять отчёт
-                    </Link>
+                    <div className="row">
+                      {s.status === "ready" && online && (
+                        <button type="button" className="secondary" onClick={() => void act(s, "start")}>
+                          Начать работы
+                        </button>
+                      )}
+                      {s.status === "in_progress" && online && (
+                        <button type="button" className="secondary" onClick={() => void trySubmit(s)}>
+                          Сдать этап
+                        </button>
+                      )}
+                      <Link
+                        className="button primary"
+                        href={`/lite/capture?stage=${s.id}&title=${encodeURIComponent(s.title)}&address=${encodeURIComponent(obj.address_text)}`}
+                      >
+                        Снять отчёт
+                      </Link>
+                    </div>
                   </li>
                 ))}
               </ul>

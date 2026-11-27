@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import { formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub } from "@/lib/format";
-import type { AdminUser, AuditEntry, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
+import { formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
+import type { AdminUser, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
-type Tab = "orgs" | "catalog" | "users" | "audit";
+type Tab = "orgs" | "catalog" | "checklists" | "users" | "audit";
 
 export default function AdminPage() {
   const { me, loading } = useRequireAuth({ admin: true });
@@ -23,6 +23,7 @@ export default function AdminPage() {
           [
             ["orgs", "Организации"],
             ["catalog", "Справочник расценок"],
+            ["checklists", "Чек-листы фото"],
             ["users", "Пользователи"],
             ["audit", "Журнал действий"],
           ] as [Tab, string][]
@@ -34,6 +35,7 @@ export default function AdminPage() {
       </div>
       {tab === "orgs" && <OrgsTab />}
       {tab === "catalog" && <CatalogTab />}
+      {tab === "checklists" && <ChecklistsTab />}
       {tab === "users" && <UsersTab />}
       {tab === "audit" && <AuditTab />}
     </Shell>
@@ -569,6 +571,158 @@ function CatalogTab() {
             ))}
           </tbody>
         </table></div>
+      )}
+    </section>
+  );
+}
+
+type DraftItem = { id?: string; title: string; required_angle: string; photo_required: boolean };
+type Draft = { id?: string; stage_type: string; title: string; items: DraftItem[] };
+
+function ChecklistsTab() {
+  const [templates, setTemplates] = useState<ChecklistTemplate[] | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setTemplates(await api<ChecklistTemplate[]>("/checklist-templates"));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, []);
+  useEffect(() => void load(), [load]);
+
+  function edit(t: ChecklistTemplate) {
+    setSaved(false);
+    setError(null);
+    setDraft({
+      id: t.id,
+      stage_type: t.stage_type,
+      title: t.title,
+      items: t.items.map((i) => ({ id: i.id, title: i.title, required_angle: i.required_angle ?? "", photo_required: i.photo_required })),
+    });
+  }
+
+  function setItem(index: number, patch: Partial<DraftItem>) {
+    if (!draft) return;
+    setDraft({ ...draft, items: draft.items.map((it, i) => (i === index ? { ...it, ...patch } : it)) });
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (!draft) return;
+    setError(null);
+    const body = {
+      stage_type: draft.stage_type,
+      title: draft.title,
+      items: draft.items
+        .filter((i) => i.title.trim())
+        .map((i) => ({ id: i.id, title: i.title.trim(), required_angle: i.required_angle.trim() || null, photo_required: i.photo_required })),
+    };
+    try {
+      if (draft.id) await api(`/checklist-templates/${draft.id}`, { method: "PUT", body });
+      else await api("/checklist-templates", { method: "POST", body });
+      setDraft(null);
+      setSaved(true);
+      await load();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  const free = Object.keys(STAGE_TYPE_LABELS).filter((code) => !templates?.some((t) => t.stage_type === code));
+  if (templates === null) return error ? <ErrorNote text={error} /> : <Loading />;
+  return (
+    <section className="card">
+      <p className="muted">
+        Чек-лист подбирается к этапу по виду работ. Прораб видит пункты при съёмке, инженер — какие ракурсы не сняты.
+      </p>
+      {saved && <p className="ok">Чек-лист сохранён.</p>}
+      {draft ? (
+        <form onSubmit={save} className="boxed">
+          <div className="grid2">
+            <div>
+              <label htmlFor="cl-type">Вид работ</label>
+              <select id="cl-type" value={draft.stage_type} disabled={Boolean(draft.id)} onChange={(e) => setDraft({ ...draft, stage_type: e.target.value })}>
+                {(draft.id ? [draft.stage_type] : free).map((code) => (
+                  <option key={code} value={code}>
+                    {STAGE_TYPE_LABELS[code] ?? code}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="cl-title">Название</label>
+              <input id="cl-title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+            </div>
+          </div>
+          <h3>Пункты</h3>
+          {draft.items.map((it, index) => (
+            <div key={it.id ?? `new-${index}`} className="grid2 boxed">
+              <div>
+                <label htmlFor={`cl-i-${index}`}>Что снять</label>
+                <input id={`cl-i-${index}`} value={it.title} onChange={(e) => setItem(index, { title: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor={`cl-a-${index}`}>Подсказка по ракурсу</label>
+                <input id={`cl-a-${index}`} value={it.required_angle} onChange={(e) => setItem(index, { required_angle: e.target.value })} />
+              </div>
+              <label className="check">
+                <input type="checkbox" checked={it.photo_required} onChange={(e) => setItem(index, { photo_required: e.target.checked })} />
+                <span>Фото обязательно</span>
+              </label>
+              <div className="row">
+                <button type="button" className="secondary small" onClick={() => setDraft({ ...draft, items: draft.items.filter((_, i) => i !== index) })}>
+                  Убрать пункт «{it.title || "без названия"}»
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="row">
+            <button type="button" className="secondary" onClick={() => setDraft({ ...draft, items: [...draft.items, { title: "", required_angle: "", photo_required: true }] })}>
+              Добавить пункт
+            </button>
+            <button type="submit" className="primary" disabled={!draft.title.trim() || !draft.items.some((i) => i.title.trim())}>
+              Сохранить чек-лист
+            </button>
+            <button type="button" className="secondary" onClick={() => setDraft(null)}>
+              Отмена
+            </button>
+          </div>
+          <ErrorNote text={error} />
+        </form>
+      ) : (
+        <>
+          <ul className="list">
+            {templates.map((t) => (
+              <li key={t.id}>
+                <div>
+                  <b>{t.stage_type_title}</b>
+                  <div className="muted">
+                    {t.title} · пунктов: {t.items.length}, обязательных фото: {t.items.filter((i) => i.photo_required).length}
+                  </div>
+                </div>
+                <button className="secondary small" onClick={() => edit(t)}>
+                  Изменить
+                </button>
+              </li>
+            ))}
+          </ul>
+          {free.length > 0 && (
+            <button
+              className="secondary"
+              onClick={() => {
+                setSaved(false);
+                setDraft({ stage_type: free[0], title: STAGE_TYPE_LABELS[free[0]], items: [{ title: "", required_angle: "", photo_required: true }] });
+              }}
+            >
+              Новый чек-лист
+            </button>
+          )}
+          <ErrorNote text={error} />
+        </>
       )}
     </section>
   );
