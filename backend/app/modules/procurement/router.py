@@ -31,6 +31,7 @@ from app.core.storage import check_file_link, get_storage, signed_file_url
 from app.domain.statuses import ensure_transition
 from app.models import (
     Delivery,
+    EngineerQuestion,
     MaterialRequest,
     ObjectAssignment,
     Organization,
@@ -516,7 +517,7 @@ async def set_request_status(
     "/files/{kind}/{file_id}", summary="Файл по подписанной ссылке", response_class=Response
 )
 async def file_content(
-    kind: Literal["audio", "invoice"],
+    kind: Literal["audio", "invoice", "question"],
     file_id: uuid.UUID,
     exp: int,
     v: uuid.UUID,
@@ -528,6 +529,9 @@ async def file_content(
     if kind == "audio":
         req = await db.get(MaterialRequest, file_id)
         key, content_type = (req.audio_key, req.audio_type) if req else (None, None)
+    elif kind == "question":
+        q = await db.get(EngineerQuestion, file_id)
+        key, content_type = (q.photo_key, q.photo_type) if q else (None, None)
     else:
         delivery = await db.get(Delivery, file_id)
         key = delivery.invoice_key if delivery else None

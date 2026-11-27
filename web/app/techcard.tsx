@@ -12,7 +12,7 @@ export function CardStatus({ card }: { card: TechCard }) {
   );
 }
 
-export function StepDetails({ step }: { step: TechStep }) {
+export function StepDetails({ step, stageType }: { step: TechStep; stageType?: string }) {
   return (
     <>
       <p>{step.how}</p>
@@ -39,6 +39,15 @@ export function StepDetails({ step }: { step: TechStep }) {
         </>
       )}
       {step.photo && <p className="muted small">Фото: {step.photo}</p>}
+      {step.example_key && stageType && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="example-photo"
+          src={`/api/v1/tech-cards/${stageType}/steps/${step.key}/example`}
+          alt={`Как должно получиться: ${step.title}`}
+          loading="lazy"
+        />
+      )}
     </>
   );
 }
@@ -58,7 +67,7 @@ export function TechCardView({ card, title = "Как должно быть" }: {
               {s.hidden && <span className="badge">скрытые работы</span>}
               {s.inspector && <span className="badge">проверяет инженер</span>}
             </summary>
-            <StepDetails step={s} />
+            <StepDetails step={s} stageType={card.stage_type} />
           </details>
         ))}
       </div>

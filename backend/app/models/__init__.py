@@ -9,7 +9,7 @@ from app.models.identity import (
     OrgMember,
     User,
 )
-from app.models.knowledge import DailyPlan, DailyPlanItem, TechCard
+from app.models.knowledge import DailyPlan, DailyPlanItem, EngineerQuestion, TechCard
 from app.models.money_flow import (
     Act,
     Delivery,
@@ -37,6 +37,7 @@ from app.models.work import (
 )
 
 __all__ = [
+    "EngineerQuestion",
     "DailyPlan",
     "DailyPlanItem",
     "TechCard",

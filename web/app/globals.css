@@ -871,3 +871,13 @@ audio {
   padding: var(--space) 0;
   border-top: 1px solid var(--border);
 }
+.pre {
+  white-space: pre-line;
+}
+.example-photo {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: var(--space);
+}
