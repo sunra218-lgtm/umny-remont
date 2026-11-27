@@ -20,9 +20,10 @@ import {
   STAGE_STATUS_LABELS,
   STAGE_TYPE_LABELS,
 } from "@/lib/format";
-import type { Act, Dispute, Inspection, MediaItem, Me, Member, Page, Payment, Stage, StageChecklist } from "@/lib/types";
+import type { Act, Dispute, Inspection, MediaItem, Me, Member, Page, Payment, Stage, StageChecklist, TechCard } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
+import { TechCardView } from "../../techcard";
 
 type StageDetail = {
   stage: Stage;
@@ -42,18 +43,21 @@ export default function StagePage() {
   const [detail, setDetail] = useState<StageDetail | null>(null);
   const [checklist, setChecklist] = useState<StageChecklist | null>(null);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [card, setCard] = useState<TechCard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [d, c, i] = await Promise.all([
+      const [d, c, i, t] = await Promise.all([
         api<StageDetail>(`/stages/${id}`),
         api<StageChecklist>(`/stages/${id}/checklist`),
         api<Inspection[]>(`/stages/${id}/inspections`),
+        api<TechCard | null>(`/stages/${id}/tech-card`),
       ]);
       setDetail(d);
       setChecklist(c);
       setInspections(i);
+      setCard(t);
     } catch (err) {
       setError(errorText(err));
     }
@@ -90,7 +94,8 @@ export default function StagePage() {
         </div>
         <div>
           <Checklist checklist={checklist} />
-          <Inspections detail={detail} inspections={inspections} me={me} onChanged={load} />
+          <Inspections detail={detail} inspections={inspections} me={me} card={card} onChanged={load} />
+          {card && <TechCardView card={card} />}
         </div>
       </div>
     </Shell>
@@ -284,7 +289,21 @@ function Photos({ detail, onChanged }: { detail: StageDetail; onChanged: () => P
   );
 }
 
-function Inspections({ detail, inspections, me, onChanged }: { detail: StageDetail; inspections: Inspection[]; me: Me; onChanged: () => Promise<void> }) {
+function Inspections({
+  detail,
+  inspections,
+  me,
+  card,
+  onChanged,
+}: {
+  detail: StageDetail;
+  inspections: Inspection[];
+  me: Me;
+  card: TechCard | null;
+  onChanged: () => Promise<void>;
+}) {
+  const points = card?.steps.filter((s) => s.inspector) ?? [];
+  const [checks, setChecks] = useState<Record<string, { ok: boolean | null; note: string }>>({});
   const [inspectors, setInspectors] = useState<Member[]>([]);
   const [inspector, setInspector] = useState("");
   const [slot, setSlot] = useState("");
@@ -321,8 +340,12 @@ function Inspections({ detail, inspections, me, onChanged }: { detail: StageDeta
     if (!open) return;
     setError(null);
     try {
-      await api(`/inspections/${open.id}/result`, { method: "POST", body: { result, remarks: remarks || null } });
+      const marked = points
+        .filter((p) => checks[p.key]?.ok != null)
+        .map((p) => ({ key: p.key, ok: checks[p.key].ok, note: checks[p.key].note || null }));
+      await api(`/inspections/${open.id}/result`, { method: "POST", body: { result, remarks: remarks || null, checks: marked } });
       setRemarks("");
+      setChecks({});
       await onChanged();
     } catch (err) {
       setError(errorText(err));
@@ -345,6 +368,16 @@ function Inspections({ detail, inspections, me, onChanged }: { detail: StageDeta
                 {i.signed_at && ` · подписано ${formatDate(i.signed_at)}`}
               </div>
               {i.remarks && <div>{i.remarks}</div>}
+              {i.checks && i.checks.length > 0 && (
+                <ul className="small">
+                  {i.checks.map((c) => (
+                    <li key={c.key} className={c.ok ? undefined : "error-text"}>
+                      {c.ok ? "✓" : "✗"} {c.title}
+                      {c.note && ` — ${c.note}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </li>
         ))}
@@ -372,6 +405,41 @@ function Inspections({ detail, inspections, me, onChanged }: { detail: StageDeta
       )}
       {canSign && (
         <form onSubmit={sign} className="boxed">
+          {points.length > 0 && (
+            <fieldset>
+              <legend>Пункты техкарты</legend>
+              {points.map((p) => {
+                const c = checks[p.key] ?? { ok: null, note: "" };
+                const set = (patch: Partial<typeof c>) => setChecks((all) => ({ ...all, [p.key]: { ...c, ...patch } }));
+                return (
+                  <div key={p.key} className="check-row">
+                    <div>
+                      <b>{p.title}</b>
+                      {p.tolerance && <div className="muted small">Допуск: {p.tolerance}</div>}
+                    </div>
+                    <div className="row">
+                      <label className="check">
+                        <input type="radio" name={`c-${p.key}`} checked={c.ok === true} onChange={() => set({ ok: true })} />
+                        <span>В норме</span>
+                      </label>
+                      <label className="check">
+                        <input type="radio" name={`c-${p.key}`} checked={c.ok === false} onChange={() => set({ ok: false })} />
+                        <span>Замечание</span>
+                      </label>
+                    </div>
+                    {c.ok === false && (
+                      <input
+                        aria-label={`Замечание: ${p.title}`}
+                        placeholder="Что не так"
+                        value={c.note}
+                        onChange={(e) => set({ note: e.target.value })}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </fieldset>
+          )}
           <fieldset>
             <legend>Результат проверки</legend>
             {(["passed", "remarks", "failed"] as const).map((r) => (

@@ -39,6 +39,8 @@ TEMPLATES: dict[str, str] = {
     "order_shipped": "Материалы по заказу отправлены на объект {address}. Примите доставку.",
     "delivery_problem": "Доставка на объект {address}: {result}. {url}",
     "order_delivered": "Материалы доставлены на объект {address}. {url}",
+    "day_reported": "Бригада отчиталась о работах за {day}: {address}. Примите день: {url}",
+    "day_returned": "Работы за {day} не приняты: {note}. {url}",
     "daily_reminder": "Пришлите фотоотчёт за сегодня по объекту {address}: {url}",
 }
 

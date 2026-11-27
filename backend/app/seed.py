@@ -167,7 +167,17 @@ async def seed_checklists() -> int:
     return len(CHECKLISTS)
 
 
+async def seed_cards() -> int:
+    from app.modules.techcards.service import seed_tech_cards
+
+    async for db in get_session():
+        return await seed_tech_cards(db)
+    return 0
+
+
 async def main() -> None:
+    added = await seed_cards()
+    print(f"Техкарты: добавлено {added}")  # noqa: T201
     added = await seed_catalog()
     print(f"Справочник расценок: добавлено {added} позиций")  # noqa: T201
     added = await seed_checklists()

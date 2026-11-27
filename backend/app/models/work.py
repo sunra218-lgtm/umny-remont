@@ -228,6 +228,8 @@ class ChecklistItem(UUIDPk, Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     required_angle: Mapped[str | None] = mapped_column(String(200))
     photo_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Шаг технологической карты, из которого собран пункт.
+    step_key: Mapped[str | None] = mapped_column(String(50))
 
 
 class Inspection(UUIDPk, Timestamps, Base):
@@ -242,6 +244,10 @@ class Inspection(UUIDPk, Timestamps, Base):
         pg_enum(InspectionResult, "inspection_result")
     )
     remarks: Mapped[str | None] = mapped_column(Text)
+    # Отметки инженера по пунктам техкарты: [{"key", "ok", "note"}].
+    checks: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

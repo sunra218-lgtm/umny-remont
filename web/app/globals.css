@@ -841,3 +841,33 @@ audio {
   font-size: 16px;
   font-weight: 400;
 }
+
+/* Техкарта: шаги раскрываются по нажатию. */
+.tc-steps details {
+  border-top: 1px solid var(--border);
+  padding: calc(var(--space) * 1.25) 0;
+}
+.tc-steps details:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.tc-steps summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 24px;
+}
+.tc-steps summary .badge {
+  margin-left: calc(var(--space) * 0.75);
+  font-weight: 400;
+}
+.tc-steps details > :not(summary) {
+  margin-top: var(--space);
+}
+.check-row {
+  display: flex;
+  gap: calc(var(--space) * 1.5);
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: var(--space) 0;
+  border-top: 1px solid var(--border);
+}
