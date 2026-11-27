@@ -155,7 +155,7 @@ async def open_dispute(
     await db.flush()
     _set_status(db, "stage", stage, StageStatus.frozen, "stage.frozen", current.id, ip)
     if dispute.frozen_payment_id and hold is not None:
-        await payments.run(db, await get_bank().freeze(hold.id), current.id)
+        await payments.run(db, await get_bank().freeze(hold), current.id)
     obj = access.obj
     if obj.status == ObjectStatus.active:
         _set_status(db, "object", obj, ObjectStatus.dispute, "object.dispute", current.id, ip)
@@ -254,11 +254,11 @@ async def resolve_dispute(
     bank = get_bank()
     if body.outcome == "continue":
         if payment is not None and payment.status == PaymentStatus.frozen:
-            await payments.run(db, await bank.unfreeze(payment.id), current.id)
+            await payments.run(db, await bank.unfreeze(payment), current.id)
         target = dispute.stage_status_before or StageStatus.ready
     else:
         if payment is not None and payment.status in (PaymentStatus.frozen, PaymentStatus.held):
-            await payments.run(db, await bank.refund(payment.id, payment.amount_kop), current.id)
+            await payments.run(db, await bank.refund(payment, payment.amount_kop), current.id)
         # Пока резерва нет, этап снова ждёт денег; без резерва — планируется заново.
         target = StageStatus.funding
         # Неподписанные акты по этапу теряют смысл: деньги вернулись.

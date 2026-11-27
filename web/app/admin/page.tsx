@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import { api, errorText } from "@/lib/api";
+import { api, download, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { OBJECT_STATUS_LABELS, DISPUTE_OUTCOME_LABELS, DISPUTE_STATUS_LABELS, formatDate, formatPhone, ORG_TYPE_LABELS, parseRub, ROLE_LABELS, ROLES_BY_ORG_TYPE, rub, STAGE_TYPE_LABELS } from "@/lib/format";
 import type { AdminUser, Dispute, Kpi, AuditEntry, ChecklistTemplate, Member, Org, OrgRole, OrgType, Page, PriceItem } from "@/lib/types";
@@ -216,6 +216,20 @@ function OrgDetail({ org, onChanged }: { org: Org; onChanged: (org: Org) => Prom
     }
   }
 
+  const [partner, setPartner] = useState(org.bank_partner_id ?? "");
+  useEffect(() => setPartner(org.bank_partner_id ?? ""), [org.bank_partner_id]);
+  async function savePartner(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await onChanged(
+        await api<Org>(`/organizations/${org.id}`, { method: "PATCH", body: { bank_partner_id: partner.trim() || null } }),
+      );
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
   return (
     <section className="card">
       <div className="row between">
@@ -235,6 +249,21 @@ function OrgDetail({ org, onChanged }: { org: Org; onChanged: (org: Org) => Prom
         {org.kpp && (<><dt>КПП</dt><dd>{org.kpp}</dd></>)}
         {org.bank_account && (<><dt>Счёт</dt><dd>{org.bank_account}, БИК {org.bank_bik}</dd></>)}
       </dl>
+
+      {(org.type === "contractor" || org.type === "supplier") && (
+        <form onSubmit={savePartner} className="grid2 boxed">
+          <div>
+            <label htmlFor="o-partner">Код получателя в банке</label>
+            <input id="o-partner" value={partner} maxLength={64} onChange={(e) => setPartner(e.target.value)} />
+            <p className="muted small">Банк выдаёт код после регистрации организации для выплат. Без кода деньги по актам не уходят.</p>
+          </div>
+          <div className="row end">
+            <button type="submit" className="secondary" disabled={(org.bank_partner_id ?? "") === partner.trim()}>
+              Сохранить код
+            </button>
+          </div>
+        </form>
+      )}
 
       <h3>Сотрудники</h3>
       {members === null ? (
@@ -811,7 +840,12 @@ function PilotTab() {
             </li>
           ))}
         </ul>
-        <p className="muted small">Обновлено {formatDate(kpi.generated_at)}</p>
+        <div className="row between">
+          <p className="muted small">Обновлено {formatDate(kpi.generated_at)}</p>
+          <button className="secondary small" onClick={() => void download("/admin/kpi.csv").catch((err) => setError(errorText(err)))}>
+            Скачать отчёт для Excel
+          </button>
+        </div>
       </section>
       <section className="card">
         <h2>Фотоотчёты по объектам</h2>

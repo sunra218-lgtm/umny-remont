@@ -87,6 +87,8 @@ class OrgCreate(OrgRequisites):
 
 class OrgUpdate(OrgRequisites):
     legal_name: str | None = Field(default=None, min_length=2, max_length=300)
+    # Код получателя в банке: администратор вносит его после регистрации организации в банке.
+    bank_partner_id: str | None = Field(default=None, max_length=64)
 
 
 class OrgOut(BaseModel):
@@ -98,6 +100,7 @@ class OrgOut(BaseModel):
     legal_name: str
     bank_bik: str | None
     bank_account: str | None
+    bank_partner_id: str | None = None
     rating: Decimal | None
     sla_score: Decimal | None
     verified_at: datetime | None

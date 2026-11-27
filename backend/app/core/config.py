@@ -49,10 +49,21 @@ class Settings(BaseSettings):
 
     # Банк безопасной сделки. fake — имитация для разработки и тестов:
     # заказчик «оплачивает» резерв на тестовой странице сайта.
-    # Настоящий банк подключается отдельным классом в app/modules/payments/bank.py.
-    bank_backend: Literal["fake"] = "fake"
+    # tbank — Т-Банк: интернет-эквайринг с безопасной сделкой и выплаты (e2c).
+    bank_backend: Literal["fake", "tbank"] = "fake"
     bank_webhook_secret: str = DEV_BANK_SECRET
     bank_hold_ttl_s: int = 3 * 24 * 3600
+    # Т-Банк. Терминал приёма оплаты и терминал выплат выдаёт банк по договору;
+    # у тестовых терминалов в конце ключа стоит DEMO. Ключи — только в .env на сервере.
+    tbank_api_url: str = "https://securepay.tinkoff.ru/v2"
+    tbank_payout_api_url: str = "https://securepay.tinkoff.ru/e2c/v2"
+    tbank_terminal_key: str | None = None
+    tbank_password: str | None = None
+    tbank_payout_terminal_key: str | None = None
+    tbank_payout_password: str | None = None
+    # Код платформы как получателя выплат (маржа, комиссия).
+    tbank_platform_partner_id: str | None = None
+    tbank_timeout_s: float = 20.0
     # Комиссия платформы с этапа в сотых долях процента (100 = 1 %).
     # Ставку задаёт владелец проекта.
     platform_fee_bp: int = 0
@@ -103,6 +114,15 @@ class Settings(BaseSettings):
                 raise ValueError("OTP_DEBUG нельзя включать в prod")
             if not self.cookie_secure:
                 raise ValueError("В prod COOKIE_SECURE должен быть true")
+            if self.bank_backend == "tbank" and not all(
+                (
+                    self.tbank_terminal_key,
+                    self.tbank_password,
+                    self.tbank_payout_terminal_key,
+                    self.tbank_payout_password,
+                )
+            ):
+                raise ValueError("Для Т-Банка нужны ключи обоих терминалов (TBANK_*)")
             if self.bank_webhook_secret == DEV_BANK_SECRET or len(self.bank_webhook_secret) < 32:
                 raise ValueError("В prod нужен собственный BANK_WEBHOOK_SECRET от 32 символов")
             if not self.public_base_url.startswith("https://"):

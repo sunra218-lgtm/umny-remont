@@ -1,9 +1,12 @@
 """Показатели пилота против целей Gate 1 (ТЗ 2.3, раздел 1.3)."""
 
+import csv
+import io
 import uuid
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -214,3 +217,76 @@ async def collect_kpi(db: AsyncSession) -> KpiOut:
 @router.get("/kpi", response_model=KpiOut, summary="Показатели пилота (Gate 1)")
 async def kpi(_: PlatformAdmin, db: DbSession) -> KpiOut:
     return await collect_kpi(db)
+
+
+STATUS_RU = {
+    ObjectStatus.active: "в работе",
+    ObjectStatus.dispute: "спор",
+    ObjectStatus.completed: "завершён",
+}
+
+
+def kpi_csv(data: KpiOut) -> str:
+    """Отчёт для таблицы (Excel): разделитель «;», дробная часть через запятую."""
+    buf = io.StringIO()
+    out = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+
+    def num(value: float) -> str:
+        return (f"{value:g}").replace(".", ",")
+
+    generated = data.generated_at.astimezone(MSK).strftime("%d.%m.%Y %H:%M")
+    out.writerow(["Отчёт пилота «Умный ремонт» — цели Gate 1", f"на {generated} МСК"])
+    out.writerow([])
+    out.writerow(["Показатель", "Факт", "Цель", "Ед.", "Выполнено", "Пояснение"])
+    for m in data.metrics:
+        out.writerow(
+            [m.title, num(m.value), num(m.target), m.unit, "да" if m.ok else "нет", m.note or ""]
+        )
+    out.writerow([])
+    out.writerow(
+        [
+            "Объект",
+            "Подрядчик",
+            "Статус",
+            "В пилоте с",
+            "Рабочих дней",
+            "Дней с фотоотчётом",
+            "Доля, %",
+            "Последний отчёт",
+        ]
+    )
+    for o in data.objects:
+        share = round(100 * o.days_with_reports / o.working_days) if o.working_days else 0
+        last = ""
+        if o.last_report_at:
+            last = o.last_report_at.astimezone(MSK).strftime("%d.%m.%Y %H:%M")
+        out.writerow(
+            [
+                o.address,
+                o.contractor or "",
+                STATUS_RU.get(o.status, o.status.value),
+                o.since.strftime("%d.%m.%Y"),
+                o.working_days,
+                o.days_with_reports,
+                share,
+                last,
+            ]
+        )
+    return buf.getvalue()
+
+
+@router.get(
+    "/kpi.csv",
+    summary="Отчёт пилота (Gate 1) для таблицы",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}}},
+)
+async def kpi_export(_: PlatformAdmin, db: DbSession) -> Response:
+    data = await collect_kpi(db)
+    name = f"gate1-{data.generated_at.astimezone(MSK):%Y-%m-%d}.csv"
+    # BOM — чтобы Excel сразу открыл русский текст в правильной кодировке.
+    return Response(
+        content="\ufeff" + kpi_csv(data),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
