@@ -42,6 +42,7 @@ import type {
 
 import { ErrorNote, Loading, Shell } from "../../components";
 import { Cameras } from "../../cameras";
+import { ObjectMarket } from "../../market";
 import { DailyPlans } from "../../daily";
 import { BasketForm, OrderCard } from "../../orders";
 
@@ -88,6 +89,7 @@ export default function ObjectPage() {
       <ErrorNote text={error} />
       <div className="split">
         <div>
+          <ObjectMarket obj={obj} onChanged={load} />
           <ServiceOrders obj={obj} me={me} onObjectChanged={load} />
           <Estimates obj={obj} />
           <Stages obj={obj} />

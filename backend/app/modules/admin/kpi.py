@@ -15,6 +15,9 @@ from app.core.deps import DbSession, PlatformAdmin
 from app.core.security import utcnow
 from app.models import (
     AuditLog,
+    ContractorReview,
+    MarketBid,
+    MarketTask,
     MediaReport,
     Organization,
     Payment,
@@ -54,10 +57,107 @@ class ObjectReport(BaseModel):
     last_report_at: datetime | None
 
 
+class ModeStats(BaseModel):
+    """Сравнение режимов поиска подрядчика: подбор платформой и маркетплейс."""
+
+    mode: str
+    title: str
+    objects: int
+    with_contractor: int
+    contractor_pct: float
+    hours_to_contractor: float | None  # медиана от создания объекта до выбора подрядчика
+    reached_work: int
+    reached_work_pct: float
+    bids_per_task: float | None
+    tasks_without_bids: int | None
+    avg_rating: float | None
+    reviews: int
+
+
 class KpiOut(BaseModel):
     metrics: list[Metric]
     objects: list[ObjectReport]
+    modes: list[ModeStats] = []
     generated_at: datetime
+
+
+MODE_TITLES = {"platform": "Подбор платформой", "market": "Маркетплейс"}
+WORKED = (ObjectStatus.active, ObjectStatus.dispute, ObjectStatus.completed)
+
+
+async def _mode_stats(db: AsyncSession) -> list[ModeStats]:
+    objs = (
+        await db.execute(
+            select(
+                RepairObject.id,
+                RepairObject.match_mode,
+                RepairObject.status,
+                RepairObject.contractor_org_id,
+                RepairObject.created_at,
+            ).where(RepairObject.deleted_at.is_(None))
+        )
+    ).all()
+    chosen = dict(
+        (
+            await db.execute(
+                select(AuditLog.entity_id, func.min(AuditLog.created_at))
+                .where(AuditLog.action == "object.contractor_set")
+                .group_by(AuditLog.entity_id)
+            )
+        ).all()
+    )
+    bids = dict(
+        (
+            await db.execute(
+                select(MarketTask.object_id, func.count(MarketBid.id))
+                .outerjoin(
+                    MarketBid,
+                    (MarketBid.task_id == MarketTask.id) & (MarketBid.status != "withdrawn"),
+                )
+                .group_by(MarketTask.object_id)
+            )
+        ).all()
+    )
+    ratings = {
+        oid: r
+        for oid, r in (
+            await db.execute(select(ContractorReview.object_id, ContractorReview.rating))
+        ).all()
+    }
+    out = []
+    for mode, title in MODE_TITLES.items():
+        rows = [o for o in objs if o.match_mode == mode]
+        with_c = [o for o in rows if o.contractor_org_id is not None]
+        hours = sorted(
+            (chosen[o.id] - o.created_at).total_seconds() / 3600
+            for o in with_c
+            if o.id in chosen and chosen[o.id] >= o.created_at
+        )
+        median = None
+        if hours:
+            mid = len(hours) // 2
+            median = hours[mid] if len(hours) % 2 else (hours[mid - 1] + hours[mid]) / 2
+        worked = [o for o in rows if o.status in WORKED]
+        tasks = [bids[o.id] for o in rows if o.id in bids] if mode == "market" else None
+        rated = [ratings[o.id] for o in rows if o.id in ratings]
+        n = len(rows)
+        out.append(
+            ModeStats(
+                mode=mode,
+                title=title,
+                objects=n,
+                with_contractor=len(with_c),
+                contractor_pct=round(100 * len(with_c) / n, 1) if n else 0.0,
+                hours_to_contractor=round(median, 1) if median is not None else None,
+                reached_work=len(worked),
+                reached_work_pct=round(100 * len(worked) / n, 1) if n else 0.0,
+                bids_per_task=round(sum(tasks) / len(tasks), 1) if tasks else None,
+                tasks_without_bids=sum(1 for t in tasks if t == 0) if tasks is not None else None,
+                avg_rating=round(sum(rated) / len(rated), 2) if rated else None,
+                reviews=len(rated),
+            )
+        )
+    return out
 
 
 def working_days(start: date, end: date) -> list[date]:
@@ -211,7 +311,7 @@ async def collect_kpi(db: AsyncSession) -> KpiOut:
             note=f"Фактическая маржа по доставленным: {rub(margin or 0)}",
         ),
     ]
-    return KpiOut(metrics=metrics, objects=objects, generated_at=now)
+    return KpiOut(metrics=metrics, objects=objects, modes=await _mode_stats(db), generated_at=now)
 
 
 @router.get("/kpi", response_model=KpiOut, summary="Показатели пилота (Gate 1)")
@@ -272,6 +372,37 @@ def kpi_csv(data: KpiOut) -> str:
                 last,
             ]
         )
+    if data.modes:
+        out.writerow([])
+        out.writerow(
+            [
+                "Режим подбора",
+                "Объектов",
+                "Подрядчик найден",
+                "Доля, %",
+                "Часов до подрядчика (медиана)",
+                "Дошли до работ",
+                "Доля, %",
+                "Откликов на заявку",
+                "Заявок без откликов",
+                "Средняя оценка",
+            ]
+        )
+        for m in data.modes:
+            out.writerow(
+                [
+                    m.title,
+                    m.objects,
+                    m.with_contractor,
+                    num(m.contractor_pct),
+                    num(m.hours_to_contractor) if m.hours_to_contractor is not None else "",
+                    m.reached_work,
+                    num(m.reached_work_pct),
+                    num(m.bids_per_task) if m.bids_per_task is not None else "",
+                    m.tasks_without_bids if m.tasks_without_bids is not None else "",
+                    num(m.avg_rating) if m.avg_rating is not None else "",
+                ]
+            )
     return buf.getvalue()
 
 

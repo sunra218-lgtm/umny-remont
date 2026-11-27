@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -14,6 +15,8 @@ class ObjectCreate(BaseModel):
     area_m2: Decimal | None = Field(default=None, gt=0, le=2000, decimal_places=2)
     geo_lat: Decimal | None = Field(default=None, ge=-90, le=90)
     geo_lon: Decimal | None = Field(default=None, ge=-180, le=180)
+    # Как искать подрядчика: подберёт платформа или заказчик выберет сам из откликов.
+    match_mode: Literal["platform", "market"] = "platform"
     # Только для администратора: создать объект от имени заказчика.
     customer_phone: str | None = None
 
@@ -53,6 +56,7 @@ class ObjectOut(BaseModel):
     customer: PersonOut | None = None
     contractor_org_id: uuid.UUID | None
     contractor_name: str | None = None
+    match_mode: str = "platform"
     created_at: datetime
     access: dict[str, bool] = Field(default_factory=dict)
 

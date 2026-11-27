@@ -11,6 +11,13 @@ from app.models.identity import (
     User,
 )
 from app.models.knowledge import DailyPlan, DailyPlanItem, EngineerQuestion, TechCard
+from app.models.market import (
+    ContractorProfile,
+    ContractorReview,
+    MarketBid,
+    MarketTask,
+    PortfolioPhoto,
+)
 from app.models.money_flow import (
     Act,
     Delivery,
@@ -38,6 +45,11 @@ from app.models.work import (
 )
 
 __all__ = [
+    "ContractorProfile",
+    "ContractorReview",
+    "MarketBid",
+    "MarketTask",
+    "PortfolioPhoto",
     "Camera",
     "CameraFrame",
     "EngineerQuestion",
