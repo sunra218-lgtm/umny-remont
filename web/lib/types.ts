@@ -238,6 +238,7 @@ export type Inspection = {
   scheduled_at: string | null;
   result: "passed" | "failed" | "remarks" | null;
   remarks: string | null;
+  checks?: { key: string; ok: boolean; note: string | null; title: string }[];
   signed_at: string | null;
   created_at: string;
 };
@@ -371,4 +372,77 @@ export type Kpi = {
     last_report_at: string | null;
   }[];
   generated_at: string;
+};
+
+export type TechStep = {
+  key: string;
+  title: string;
+  how: string;
+  tolerance: string | null;
+  check: string | null;
+  mistakes: string[];
+  photo: string | null;
+  hidden: boolean;
+  inspector: boolean;
+  example_key?: string | null;
+};
+
+export type TechMaterial = {
+  key: string;
+  name: string;
+  rate: number;
+  per: string;
+  unit: string;
+  per_mm: boolean;
+  thickness_mm: number | null;
+  pack: number | null;
+  pack_title: string | null;
+  reserve_pct: number;
+  note: string | null;
+};
+
+export type TechCard = {
+  stage_type: string;
+  stage_type_title: string;
+  title: string;
+  summary: string | null;
+  norms: string[];
+  steps: TechStep[];
+  materials: TechMaterial[];
+  version: number;
+  verified_at: string | null;
+  updated_at: string;
+};
+
+export type TechCardBrief = {
+  stage_type: string;
+  stage_type_title: string;
+  title: string;
+  steps: number;
+  version: number;
+  verified_at: string | null;
+};
+
+export type DailyPlanItem = {
+  id: string;
+  title: string;
+  stage_id: string | null;
+  stage_title: string | null;
+  done: boolean;
+  note: string | null;
+};
+
+export type DailyPlan = {
+  id: string;
+  object_id: string;
+  day: string;
+  status: "planned" | "reported" | "accepted" | "returned";
+  items: DailyPlanItem[];
+  report_note: string | null;
+  reported_at: string | null;
+  review_note: string | null;
+  reviewed_at: string | null;
+  photos: number;
+  can_edit: boolean;
+  can_review: boolean;
 };

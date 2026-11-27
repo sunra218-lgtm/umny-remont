@@ -8,6 +8,7 @@ import { formatDate, STAGE_STATUS_LABELS } from "@/lib/format";
 import { useLite } from "@/lib/lite";
 import type { Page, RepairObject, Stage, StageChecklist } from "@/lib/types";
 
+import { DailyPlans } from "../daily";
 import { LiteMaterials } from "./materials";
 import { cacheGet, cacheSet, LiteGate } from "./parts";
 
@@ -186,6 +187,7 @@ function Home() {
                 ))}
               </ul>
             )}
+            <DailyPlans objectId={obj.id} stages={stages} canPlan online={online} nested />
             <LiteMaterials objectId={obj.id} stages={stages} online={online} />
           </section>
         ))

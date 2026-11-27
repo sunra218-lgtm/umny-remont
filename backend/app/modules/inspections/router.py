@@ -3,6 +3,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field, model_validator
@@ -39,6 +40,7 @@ from app.modules.notifications import service as notes
 from app.modules.notifications.service import MSK
 from app.modules.objects.router import _stage_out, ensure_assignment
 from app.modules.objects.schemas import StageOut
+from app.modules.techcards.service import card_for
 
 router = APIRouter(tags=["inspections"])
 
@@ -251,9 +253,17 @@ class InspectionCreate(BaseModel):
     scheduled_at: datetime | None = None
 
 
+class CheckIn(BaseModel):
+    key: str = Field(max_length=50)
+    ok: bool
+    note: str | None = Field(default=None, max_length=1000)
+
+
 class InspectionResultIn(BaseModel):
     result: InspectionResult
     remarks: str | None = Field(default=None, max_length=5000)
+    # Отметки по пунктам техкарты, которые инженер проверяет на стоп-точке.
+    checks: list[CheckIn] = Field(default_factory=list, max_length=60)
 
     @model_validator(mode="after")
     def remarks_required(self) -> "InspectionResultIn":
@@ -274,6 +284,7 @@ class InspectionOut(BaseModel):
     scheduled_at: datetime | None
     result: InspectionResult | None
     remarks: str | None
+    checks: list[dict[str, Any]] = []
     signed_at: datetime | None
     created_at: datetime
 
@@ -300,6 +311,7 @@ def _inspection_out(i: Inspection, s: Stage, o: RepairObject, u: User) -> Inspec
         scheduled_at=i.scheduled_at,
         result=i.result,
         remarks=i.remarks,
+        checks=i.checks or [],
         signed_at=i.signed_at,
         created_at=i.created_at,
     )
@@ -365,7 +377,11 @@ async def create_inspection(
         [body.inspector_id],
         "inspection_scheduled",
         address=obj.address_text if obj else "",
-        when=body.scheduled_at.astimezone(MSK).strftime("%d.%m %H:%M"),
+        when=(
+            body.scheduled_at.astimezone(MSK).strftime("%d.%m %H:%M")
+            if body.scheduled_at
+            else "время согласуют"
+        ),
         url=notes.url("/inspections"),
     )
     await db.commit()
@@ -429,12 +445,26 @@ async def inspection_result(
     assert stage is not None
     if stage.status != StageStatus.inspection:
         raise Problem(409, "stage-not-submitted", "Прораб ещё не сдал этап на проверку")
+    card = await card_for(db, stage.stage_type)
+    required = {s["key"]: s["title"] for s in (card.steps if card else []) if s.get("inspector")}
+    unknown = [c.key for c in body.checks if c.key not in required]
+    if unknown:
+        raise Problem(422, "unknown-check", "Пункта нет в техкарте этапа")
+    failed = [required[c.key] for c in body.checks if not c.ok]
+    if body.result == InspectionResult.passed and failed:
+        raise Problem(
+            422,
+            "checks-failed",
+            "Есть пункты с замечаниями",
+            "Этап с невыполненными пунктами техкарты не может быть принят: " + ", ".join(failed),
+        )
     target = (
         StageStatus.acceptance
         if body.result == InspectionResult.passed
         else StageStatus.in_progress
     )
     inspection.result = body.result
+    inspection.checks = [{**c.model_dump(), "title": required[c.key]} for c in body.checks]
     inspection.remarks = (body.remarks or "").strip() or None
     inspection.signed_at = utcnow()
     audit(

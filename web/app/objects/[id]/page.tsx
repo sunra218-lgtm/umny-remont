@@ -41,6 +41,7 @@ import type {
 } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
+import { DailyPlans } from "../../daily";
 import { BasketForm, OrderCard } from "../../orders";
 
 export default function ObjectPage() {
@@ -89,6 +90,7 @@ export default function ObjectPage() {
           <ServiceOrders obj={obj} me={me} onObjectChanged={load} />
           <Estimates obj={obj} />
           <Stages obj={obj} />
+          <ObjectDays obj={obj} />
           <Materials obj={obj} />
           <Feed obj={obj} />
         </div>
@@ -471,6 +473,16 @@ function Estimates({ obj }: { obj: RepairObject }) {
       <ErrorNote text={error} />
     </section>
   );
+}
+
+function ObjectDays({ obj }: { obj: RepairObject }) {
+  const [stages, setStages] = useState<Stage[] | null>(null);
+  const working = ["contracting", "active", "dispute", "completed"].includes(obj.status);
+  useEffect(() => {
+    if (working) void api<Stage[]>(`/objects/${obj.id}/stages`).then(setStages).catch(() => setStages([]));
+  }, [obj.id, working]);
+  if (!working || stages === null) return null;
+  return <DailyPlans objectId={obj.id} stages={stages} canPlan={Boolean(obj.access.is_crew) && obj.status !== "completed"} />;
 }
 
 function Stages({ obj }: { obj: RepairObject }) {
