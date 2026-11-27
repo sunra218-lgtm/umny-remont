@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Query, Request, Response
+from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
@@ -9,8 +11,8 @@ from app.core.deps import Auth, CurrentUser, DbSession, PlatformAdmin, client_ip
 from app.core.pagination import Page
 from app.core.problems import Problem
 from app.core.security import utcnow
-from app.models import Organization, OrgMember, User
-from app.models.enums import ROLES_BY_ORG_TYPE, OrgRole, OrgType
+from app.models import DeviceSession, Organization, OrgMember, User
+from app.models.enums import ROLES_BY_ORG_TYPE, OrgRole, OrgType, SessionKind
 from app.modules.auth.service import get_or_create_user
 from app.modules.orgs.schemas import MemberAdd, MemberOut, OrgCreate, OrgOut, OrgUpdate
 
@@ -269,3 +271,49 @@ async def remove_member(
     )
     await db.commit()
     return Response(status_code=204)
+
+
+class OrgDeviceOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    phone: str
+    full_name: str | None
+    kind: SessionKind
+    user_agent: str | None
+    created_at: datetime
+    last_seen_at: datetime
+
+
+@router.get(
+    "/{org_id}/devices",
+    response_model=list[OrgDeviceOut],
+    summary="Устройства сотрудников (для руководителя)",
+)
+async def org_devices(org_id: uuid.UUID, current: Auth, db: DbSession) -> list[OrgDeviceOut]:
+    org = await _get_org(db, org_id)
+    if not _can_manage_members(current, org):
+        raise Problem(403, "forbidden", "Устройства сотрудников видит руководитель")
+    member_ids = select(OrgMember.user_id).where(OrgMember.org_id == org.id)
+    rows = await db.execute(
+        select(DeviceSession, User)
+        .join(User, User.id == DeviceSession.user_id)
+        .where(
+            DeviceSession.user_id.in_(member_ids),
+            DeviceSession.revoked_at.is_(None),
+            DeviceSession.expires_at > utcnow(),
+        )
+        .order_by(DeviceSession.last_seen_at.desc())
+    )
+    return [
+        OrgDeviceOut(
+            id=d.id,
+            user_id=u.id,
+            phone=u.phone,
+            full_name=u.full_name,
+            kind=d.kind,
+            user_agent=d.user_agent,
+            created_at=d.created_at,
+            last_seen_at=d.last_seen_at,
+        )
+        for d, u in rows
+    ]

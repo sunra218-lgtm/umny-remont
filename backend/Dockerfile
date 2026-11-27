@@ -7,7 +7,7 @@ COPY pyproject.toml ./
 RUN mkdir app && touch app/__init__.py && pip install -e ".[dev]"
 
 COPY . .
-RUN useradd --create-home --uid 1000 umny && chown -R umny /app
+RUN useradd --create-home --uid 1000 umny && mkdir -p /data/media && chown -R umny /app /data/media
 USER umny
 
 EXPOSE 8000

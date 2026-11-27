@@ -5,12 +5,12 @@ from sqlalchemy import select
 
 from app.core.audit import audit
 from app.core.config import get_settings
-from app.core.deps import Auth, DbSession, client_ip
+from app.core.deps import Auth, CurrentUser, DbSession, client_ip
 from app.core.problems import Problem
 from app.core.redis import get_redis
 from app.core.security import utcnow
-from app.models import DeviceSession, User
-from app.models.enums import ConsentType, SessionKind
+from app.models import DeviceSession, OrgMember, User
+from app.models.enums import ConsentType, OrgRole, SessionKind
 from app.modules.auth import otp, service
 from app.modules.auth.schemas import (
     DeviceOut,
@@ -120,7 +120,13 @@ async def refresh(
     token = (body.refresh_token if body else None) or request.cookies.get(REFRESH_COOKIE)
     if not token:
         raise Problem(401, "refresh-invalid", "Сеанс завершён, войдите снова")
-    device, user, new_refresh = await service.rotate_session(db, token, client_ip(request))
+    device, user, new_refresh = await service.rotate_session(
+        db,
+        token,
+        client_ip(request),
+        request.headers.get("x-device-timestamp"),
+        request.headers.get("x-device-signature"),
+    )
     await db.commit()
     access, ttl = service.issue_access(user, device)
     _set_refresh_cookie(response, new_refresh)
@@ -167,12 +173,25 @@ async def list_devices(current: Auth, db: DbSession) -> list[DeviceOut]:
     return result
 
 
+async def can_manage_devices_of(db: DbSession, current: CurrentUser, user_id: uuid.UUID) -> bool:
+    """Свои устройства — всегда; устройства сотрудников — руководителю подрядчика и админу."""
+    if user_id == current.id or current.is_platform_admin:
+        return True
+    managed_orgs = [org.id for m, org in current.memberships if m.role == OrgRole.contractor_admin]
+    if not managed_orgs:
+        return False
+    found = await db.execute(
+        select(OrgMember.id).where(OrgMember.user_id == user_id, OrgMember.org_id.in_(managed_orgs))
+    )
+    return found.first() is not None
+
+
 @router.delete("/devices/{device_id}", status_code=204, summary="Завершить сеанс на устройстве")
 async def revoke_device(
     device_id: uuid.UUID, current: Auth, request: Request, db: DbSession
 ) -> Response:
     device = await db.get(DeviceSession, device_id)
-    if device is None or (device.user_id != current.id and not current.is_platform_admin):
+    if device is None or not await can_manage_devices_of(db, current, device.user_id):
         raise Problem(404, "not-found", "Устройство не найдено")
     if device.revoked_at is None:
         device.revoked_at = utcnow()

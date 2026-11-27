@@ -12,6 +12,7 @@ import {
   ESTIMATE_TYPE_LABELS,
   formatDate,
   formatPhone,
+  FRAUD_FLAG_LABELS,
   OBJECT_STATUS_LABELS,
   OBJECT_STEPS,
   parseRub,
@@ -20,7 +21,18 @@ import {
   SERVICE_STATUS_LABELS,
   SERVICE_TYPE_LABELS,
 } from "@/lib/format";
-import type { Assignment, EstimateSummary, Me, Member, Org, Page, RepairObject, ServiceOrder, Stage } from "@/lib/types";
+import type {
+  Assignment,
+  EstimateSummary,
+  MediaItem,
+  Me,
+  Member,
+  Org,
+  Page,
+  RepairObject,
+  ServiceOrder,
+  Stage,
+} from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
 
@@ -70,6 +82,7 @@ export default function ObjectPage() {
           <ServiceOrders obj={obj} me={me} onObjectChanged={load} />
           <Estimates obj={obj} />
           <Stages obj={obj} />
+          <Feed obj={obj} />
         </div>
         <div>
           <ObjectInfo obj={obj} onChanged={load} />
@@ -540,6 +553,7 @@ function Team({ obj, me }: { obj: RepairObject; me: Me }) {
   const [candidates, setCandidates] = useState<{ user_id: string; label: string; role: Assignment["role"] }[]>([]);
   const [pick, setPick] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [linkNote, setLinkNote] = useState<{ name: string; phone: string; url: string | null } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -594,6 +608,20 @@ function Team({ obj, me }: { obj: RepairObject; me: Me }) {
     }
   }
 
+  async function sendLink(a: Assignment) {
+    setError(null);
+    setLinkNote(null);
+    try {
+      const out = await api<{ debug_url: string | null; phone: string }>("/auth/links", {
+        method: "POST",
+        body: { user_id: a.user.id, object_id: obj.id },
+      });
+      setLinkNote({ name: personName(a.user), phone: out.phone, url: out.debug_url });
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
   const canRemove = (a: Assignment) => obj.access.is_admin || (a.role === "foreman" && obj.access.can_manage_team);
   return (
     <section className="card">
@@ -610,11 +638,18 @@ function Team({ obj, me }: { obj: RepairObject; me: Me }) {
                 <b>{personName(a.user)}</b>
                 <div className="muted">{ASSIGNMENT_LABELS[a.role]}</div>
               </div>
-              {canRemove(a) && (
-                <button className="secondary small" onClick={() => void remove(a)}>
-                  Снять с объекта
-                </button>
-              )}
+              <div className="row">
+                {a.role === "foreman" && obj.access.can_manage_team && (
+                  <button className="secondary small" onClick={() => void sendLink(a)}>
+                    Ссылка для входа
+                  </button>
+                )}
+                {canRemove(a) && (
+                  <button className="secondary small" onClick={() => void remove(a)}>
+                    Снять с объекта
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -634,6 +669,83 @@ function Team({ obj, me }: { obj: RepairObject; me: Me }) {
             Назначить на объект
           </button>
         </form>
+      )}
+      {linkNote && (
+        <div className="boxed" role="status">
+          <p>
+            Отправили СМС со ссылкой на {formatPhone(linkNote.phone)}. Пусть {linkNote.name} откроет её на рабочем телефоне в
+            течение 30 минут.
+          </p>
+          {linkNote.url && (
+            <p className="devnote">
+              Режим разработки, СМС не отправляются. Ссылка: <a href={linkNote.url}>{linkNote.url}</a>
+            </p>
+          )}
+        </div>
+      )}
+      <ErrorNote text={error} />
+    </section>
+  );
+}
+
+function Feed({ obj }: { obj: RepairObject }) {
+  const [items, setItems] = useState<MediaItem[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (after: string | null) => {
+      try {
+        const page = await api<Page<MediaItem>>(`/objects/${obj.id}/feed?limit=24${after ? `&cursor=${after}` : ""}`);
+        setItems((prev) => (after && prev ? [...prev, ...page.items] : page.items));
+        setCursor(page.next_cursor);
+      } catch (err) {
+        setError(errorText(err));
+      }
+    },
+    [obj.id],
+  );
+  useEffect(() => void load(null), [load]);
+
+  return (
+    <section className="card">
+      <h2>Фотоотчёты</h2>
+      {items === null ? (
+        error ? null : <Loading />
+      ) : items.length === 0 ? (
+        <p className="muted">
+          Пока нет фото. Прораб снимает их в приложении бригады: ссылку для входа можно отправить в разделе «Кто работает на
+          объекте».
+        </p>
+      ) : (
+        <>
+          <ul className="photos">
+            {items.map((m) => (
+              <li key={m.id}>
+                <figure>
+                  <a href={m.url} target="_blank" rel="noreferrer">
+                    <img src={m.url} alt={`${m.stage_title ?? "Фото"}, ${formatDate(m.received_server_at)}`} loading="lazy" />
+                  </a>
+                  <figcaption>
+                    {m.stage_title ?? "Без этапа"} · {formatDate(m.received_server_at)}
+                    {m.author_name && <div>{m.author_name}</div>}
+                    {m.fraud_flags &&
+                      Object.keys(m.fraud_flags).map((f) => (
+                        <span className="flag" key={f}>
+                          {FRAUD_FLAG_LABELS[f] ?? f}
+                        </span>
+                      ))}
+                  </figcaption>
+                </figure>
+              </li>
+            ))}
+          </ul>
+          {cursor && (
+            <button type="button" className="secondary" onClick={() => void load(cursor)}>
+              Показать ещё
+            </button>
+          )}
+        </>
       )}
       <ErrorNote text={error} />
     </section>

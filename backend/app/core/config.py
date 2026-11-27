@@ -43,6 +43,29 @@ class Settings(BaseSettings):
     price_acceptance_kop: int = 740_000
     price_survey_kop: int = 740_000
 
+    # Адрес сайта: из него собираются ссылки для входа бригад.
+    public_base_url: str = "http://localhost:3000"
+    auth_link_ttl_s: int = 30 * 60
+
+    # Хранилище фото: local — папка на диске (тесты, разработка без MinIO),
+    # s3 — S3-совместимое хранилище (в продакшене — в РФ).
+    storage_backend: Literal["local", "s3"] = "local"
+    storage_local_dir: str = "/tmp/umny-media"  # noqa: S108
+    s3_endpoint: str | None = None
+    s3_bucket: str = "umny-media"
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+    s3_region: str = "ru-central1"
+    media_link_ttl_s: int = 15 * 60
+    max_photo_bytes: int = 2 * 1024 * 1024
+
+    # Антифрод фотоотчётов (ТЗ 2.3, раздел 6.2).
+    capture_ttl_s: int = 10 * 60
+    geo_max_distance_m: int = 300
+    geo_min_accuracy_m: int = 100
+    phash_max_distance: int = 6
+    device_signature_skew_s: int = 5 * 60
+
     consent_text_version: str = "2026-11-v1"
     idempotency_ttl_s: int = 24 * 3600
 
