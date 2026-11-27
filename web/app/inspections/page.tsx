@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { formatDate, STAGE_STATUS_LABELS } from "@/lib/format";
-import type { Inspection, Page } from "@/lib/types";
+import type { EngineerQuestion, Inspection, Page } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
@@ -51,6 +51,73 @@ export default function InspectionsPage() {
           ))}
         </ul>
       )}
+      <Questions />
     </Shell>
+  );
+}
+
+/** Вопросы бригад инженеру: текст, фото, ответ. */
+function Questions() {
+  const [items, setItems] = useState<EngineerQuestion[] | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setItems(await api<EngineerQuestion[]>("/questions"));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, []);
+  useEffect(() => void load(), [load]);
+
+  async function answer(q: EngineerQuestion) {
+    setError(null);
+    try {
+      await api(`/questions/${q.id}/answer`, { method: "POST", body: { answer: answers[q.id] } });
+      await load();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  if (items === null) return null;
+  return (
+    <section className="card" id="questions">
+      <h2>Вопросы бригад</h2>
+      <ErrorNote text={error} />
+      {items.length === 0 ? (
+        <p className="muted">Новых вопросов нет.</p>
+      ) : (
+        <ul className="list">
+          {items.map((q) => (
+            <li key={q.id}>
+              <div className="grow">
+                <b>{q.address}</b>
+                <div className="muted small">
+                  {q.stage_title ?? "Без этапа"} · {q.author_name} · {formatDate(q.created_at)}
+                </div>
+                <p>{q.text}</p>
+                {q.photo_url && (
+                  <a href={q.photo_url} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="example-photo" src={q.photo_url} alt="Фото к вопросу" loading="lazy" />
+                  </a>
+                )}
+                {q.can_answer && (
+                  <>
+                    <label htmlFor={`a-${q.id}`}>Ответ</label>
+                    <textarea id={`a-${q.id}`} rows={3} value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />
+                    <button type="button" className="primary" disabled={(answers[q.id] ?? "").trim().length < 2} onClick={() => void answer(q)}>
+                      Ответить
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

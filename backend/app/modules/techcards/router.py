@@ -107,6 +107,9 @@ async def put_card(
     card = await card_for(db, stage_type)
     old: dict[str, Any] | None = None
     data = body.model_dump(mode="json")
+    # Фото-образцы загружаются отдельно; ссылку на файл из запроса не принимаем.
+    examples = {st["key"]: st.get("example_key") for st in (card.steps if card else [])}
+    data["steps"] = [{**st, "example_key": examples.get(st["key"])} for st in data["steps"]]
     if card is None:
         card = TechCard(stage_type=stage_type, **data)
         db.add(card)

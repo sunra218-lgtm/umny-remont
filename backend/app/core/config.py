@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     # Ставку задаёт владелец проекта.
     platform_fee_bp: int = 0
 
+    # Помощник мастера. search — ответ подбирается из техкарт без нейросети;
+    # yandexgpt — YandexGPT (Яндекс Облако, данные остаются в РФ) пишет ответ по найденным
+    # шагам техкарт. Ключ сервисного аккаунта — только в .env на сервере.
+    assistant_backend: Literal["search", "yandexgpt"] = "search"
+    yandex_folder_id: str | None = None
+    yandex_api_key: str | None = None
+    yandex_gpt_model: str = "yandexgpt-lite/latest"
+
     # Адрес сайта: из него собираются ссылки для входа бригад.
     public_base_url: str = "http://localhost:3000"
     auth_link_ttl_s: int = 30 * 60

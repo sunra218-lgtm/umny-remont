@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import type { Me, TechCard, TechCardBrief, TechMaterial, TechStep } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
+import { Calculator } from "../guide";
 import { TechCardView } from "../techcard";
 
 function canEdit(me: Me): boolean {
@@ -101,6 +102,8 @@ export default function TechCardsPage() {
                 </div>
               )}
               <TechCardView card={card} title={card.title} />
+              {editor && <Examples card={card} onChanged={setCard} />}
+              <Calculator key={card.stage_type} card={card} />
               {card.materials.length > 0 && (
                 <section className="card">
                   <h2>Материалы и расход</h2>
@@ -314,5 +317,42 @@ function CardEditor({ card, onSaved, onCancel }: { card: TechCard; onSaved: (c: 
       </div>
       <ErrorNote text={error} />
     </form>
+  );
+}
+
+/** Фото правильного результата по шагам: их видят мастера в подсказках. */
+function Examples({ card, onChanged }: { card: TechCard; onChanged: (c: TechCard) => void }) {
+  const [error, setError] = useState<string | null>(null);
+  async function upload(key: string, file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    const form = new FormData();
+    form.append("photo", file);
+    try {
+      onChanged(await api<TechCard>(`/tech-cards/${card.stage_type}/steps/${key}/example`, { method: "PUT", form }));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+  return (
+    <section className="card">
+      <h2>Фото правильного результата</h2>
+      <p className="muted small">Мастер видит фото рядом с шагом. Загружайте снимки с ваших объектов без людей и адресов.</p>
+      <ul className="list">
+        {card.steps.map((s) => (
+          <li key={s.key}>
+            <div>
+              <b>{s.title}</b>
+              <div className="muted small">{s.example_key ? "Фото загружено" : "Фото нет"}</div>
+            </div>
+            <label className="button secondary small">
+              {s.example_key ? "Заменить" : "Загрузить"}
+              <input type="file" accept="image/jpeg,image/webp,image/png" hidden onChange={(e) => void upload(s.key, e.target.files?.[0])} />
+            </label>
+          </li>
+        ))}
+      </ul>
+      <ErrorNote text={error} />
+    </section>
   );
 }

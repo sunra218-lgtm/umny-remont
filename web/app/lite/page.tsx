@@ -177,6 +177,12 @@ function Home() {
                         </button>
                       )}
                       <Link
+                        className="button secondary"
+                        href={`/lite/guide?stage=${s.id}&object=${obj.id}&title=${encodeURIComponent(s.title)}`}
+                      >
+                        Как делать
+                      </Link>
+                      <Link
                         className="button primary"
                         href={`/lite/capture?stage=${s.id}&title=${encodeURIComponent(s.title)}&address=${encodeURIComponent(obj.address_text)}`}
                       >

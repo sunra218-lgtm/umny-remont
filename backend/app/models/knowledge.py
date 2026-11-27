@@ -84,3 +84,26 @@ class DailyPlanItem(UUIDPk, Base):
         Boolean, nullable=False, default=False, server_default=false()
     )
     note: Mapped[str | None] = mapped_column(String(500))
+
+
+class EngineerQuestion(UUIDPk, Timestamps, Base):
+    """Вопрос мастера инженеру технадзора с фото — «спросить инженера»."""
+
+    __tablename__ = "engineer_questions"
+
+    object_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("objects.id"), nullable=False, index=True
+    )
+    stage_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("stages.id"))
+    author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    step_key: Mapped[str | None] = mapped_column(String(50))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    photo_key: Mapped[str | None] = mapped_column(String(300))
+    photo_type: Mapped[str | None] = mapped_column(String(50))
+    # open → answered
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="open", server_default="open"
+    )
+    answer: Mapped[str | None] = mapped_column(Text)
+    answered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

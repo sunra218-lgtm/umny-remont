@@ -446,3 +446,39 @@ export type DailyPlan = {
   can_edit: boolean;
   can_review: boolean;
 };
+
+export type CalcRow = {
+  key: string;
+  name: string;
+  unit: string;
+  per: string;
+  quantity: number;
+  thickness_mm: number | null;
+  packs: number | null;
+  pack_title: string | null;
+  note: string | null;
+};
+
+export type AssistantAnswer = {
+  answer: string;
+  sources: { stage_type: string; card_title: string; step_key: string; step_title: string }[];
+  found: boolean;
+  by: "search" | "yandexgpt";
+};
+
+export type EngineerQuestion = {
+  id: string;
+  object_id: string;
+  address: string;
+  stage_id: string | null;
+  stage_title: string | null;
+  step_key: string | null;
+  author_name: string;
+  text: string;
+  photo_url: string | null;
+  status: "open" | "answered";
+  answer: string | null;
+  answered_at: string | null;
+  created_at: string;
+  can_answer: boolean;
+};
