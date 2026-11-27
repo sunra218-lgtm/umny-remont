@@ -18,6 +18,7 @@ import {
   parseRub,
   personName,
   rub,
+  REQUEST_STATUS_LABELS,
   REVIEW_LABELS,
   SERVICE_STATUS_LABELS,
   SERVICE_TYPE_LABELS,
@@ -27,17 +28,20 @@ import {
 import type {
   Assignment,
   EstimateSummary,
+  MaterialRequest,
   MediaItem,
   Me,
   Member,
   Org,
   Page,
+  PurchaseOrder,
   RepairObject,
   ServiceOrder,
   Stage,
 } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
+import { BasketForm, OrderCard } from "../../orders";
 
 export default function ObjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -85,6 +89,7 @@ export default function ObjectPage() {
           <ServiceOrders obj={obj} me={me} onObjectChanged={load} />
           <Estimates obj={obj} />
           <Stages obj={obj} />
+          <Materials obj={obj} />
           <Feed obj={obj} />
         </div>
         <div>
@@ -785,6 +790,113 @@ function Feed({ obj }: { obj: RepairObject }) {
           )}
         </>
       )}
+      <ErrorNote text={error} />
+    </section>
+  );
+}
+
+function Materials({ obj }: { obj: RepairObject }) {
+  const [orders, setOrders] = useState<PurchaseOrder[] | null>(null);
+  const [requests, setRequests] = useState<MaterialRequest[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [suppliers, setSuppliers] = useState<Org[]>([]);
+  const [editing, setEditing] = useState<PurchaseOrder | "new" | null>(null);
+  const [fromRequest, setFromRequest] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const staff = Boolean(obj.access.can_buy);
+
+  const load = useCallback(async () => {
+    try {
+      const [o, r] = await Promise.all([
+        api<PurchaseOrder[]>(`/objects/${obj.id}/purchase-orders`),
+        api<MaterialRequest[]>(`/objects/${obj.id}/material-requests`),
+      ]);
+      setOrders(o);
+      setRequests(r);
+      if (staff) {
+        const [st, sup] = await Promise.all([
+          api<Stage[]>(`/objects/${obj.id}/stages`),
+          api<Page<Org>>("/organizations?type=supplier&limit=200"),
+        ]);
+        setStages(st);
+        setSuppliers(sup.items);
+      }
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [obj.id, staff]);
+  useEffect(() => void load(), [load]);
+
+  if (orders === null) return null;
+  if (!staff && orders.length === 0 && requests.length === 0) return null;
+  const replace = (o: PurchaseOrder) => setOrders((all) => (all ?? []).map((x) => (x.id === o.id ? o : x)));
+  const openRequests = requests.filter((r) => r.status !== "done");
+
+  return (
+    <section className="card" id="materials">
+      <h2>Материалы</h2>
+      {obj.access.is_customer && orders.length > 0 && (
+        <p className="muted">Корзину собирает менеджер платформы. Деньги лежат в резерве банка, поставщик получит их после того, как прораб примет доставку.</p>
+      )}
+      {(staff || obj.access.is_crew) && openRequests.length > 0 && (
+        <>
+          <h3>Заявки прораба</h3>
+          <ul className="list">
+            {openRequests.map((r) => (
+              <li key={r.id}>
+                <div>
+                  <b>{r.text ?? "Голосовая заявка"}</b>
+                  <div className="muted small">
+                    {r.author_name}, {formatDate(r.created_at)}
+                    {r.stage_title ? ` · ${r.stage_title}` : ""} · {REQUEST_STATUS_LABELS[r.status]}
+                  </div>
+                  {r.audio_url && <audio controls preload="none" src={r.audio_url} />}
+                </div>
+                {staff && (
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setFromRequest(r.id);
+                      setEditing("new");
+                    }}
+                  >
+                    Собрать корзину
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {editing ? (
+        <BasketForm
+          objectId={obj.id}
+          stages={stages}
+          suppliers={suppliers}
+          requestId={editing === "new" ? fromRequest : null}
+          order={editing === "new" ? null : editing}
+          onCancel={() => {
+            setEditing(null);
+            setFromRequest(null);
+          }}
+          onSaved={(o) => {
+            setEditing(null);
+            setFromRequest(null);
+            setOrders((all) => [o, ...(all ?? []).filter((x) => x.id !== o.id)]);
+            void load();
+          }}
+        />
+      ) : (
+        staff && (
+          <button className="secondary" onClick={() => setEditing("new")}>
+            Собрать корзину
+          </button>
+        )
+      )}
+      {orders.length === 0 && !editing && <p className="muted">Заказов материалов пока нет.</p>}
+      {orders.map((o) => (
+        <OrderCard key={o.id} order={o} onChanged={replace} onEdit={(x) => setEditing(x)} />
+      ))}
       <ErrorNote text={error} />
     </section>
   );

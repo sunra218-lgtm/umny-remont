@@ -27,6 +27,7 @@ class PaymentOut(BaseModel):
     stage_id: uuid.UUID | None
     object_id: uuid.UUID
     act_id: uuid.UUID | None
+    purchase_order_id: uuid.UUID | None = None
     status: PaymentStatus
     amount_kop: int
     breakdown: dict[str, int]
@@ -45,6 +46,7 @@ def payment_out(p: Payment, stage: Stage | None = None, address: str | None = No
         stage_id=p.stage_id,
         object_id=p.object_id,
         act_id=p.act_id,
+        purchase_order_id=p.purchase_order_id,
         status=p.status,
         amount_kop=p.amount_kop,
         breakdown=p.split.get("breakdown", {}),

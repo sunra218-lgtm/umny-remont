@@ -35,6 +35,8 @@ from app.models.enums import (
     StageStatus,
 )
 from app.modules.checklists.router import items_of, template_for_stage_type
+from app.modules.notifications import service as notes
+from app.modules.notifications.service import MSK
 from app.modules.objects.router import _stage_out, ensure_assignment
 from app.modules.objects.schemas import StageOut
 
@@ -146,6 +148,7 @@ class StageDetail(BaseModel):
     can_review: bool
     is_admin: bool
     is_customer: bool
+    can_dispute: bool = False
 
 
 @router.get("/stages/{stage_id}", response_model=StageDetail, summary="Карточка этапа")
@@ -160,6 +163,7 @@ async def get_stage(stage_id: uuid.UUID, current: Auth, db: DbSession) -> StageD
         can_review=_is_reviewer(access),
         is_admin=access.is_admin,
         is_customer=access.is_customer,
+        can_dispute=access.is_customer or OrgRole.contractor_admin in access.contractor_roles,
     )
 
 
@@ -227,6 +231,14 @@ async def submit_stage(
     missing = [r.title for r in checklist.items if r.id in checklist.missing]
     target = StageStatus.inspection if stage.is_stop_point else StageStatus.acceptance
     _change_stage(db, request, current, stage, target, "stage.submitted", missing_items=missing)
+    if target == StageStatus.acceptance:
+        notes.notify(
+            db,
+            [access.obj.customer_id],
+            "stage_acceptance",
+            stage=stage.title,
+            url=notes.url(f"/stages/{stage.id}"),
+        )
     await db.commit()
     return SubmitOut(stage=_stage_out(stage), missing=missing)
 
@@ -347,6 +359,15 @@ async def create_inspection(
         ip=client_ip(request),
         new=body.model_dump(mode="json"),
     )
+    obj = await db.get(RepairObject, stage.object_id)
+    notes.notify(
+        db,
+        [body.inspector_id],
+        "inspection_scheduled",
+        address=obj.address_text if obj else "",
+        when=body.scheduled_at.astimezone(MSK).strftime("%d.%m %H:%M"),
+        url=notes.url("/inspections"),
+    )
     await db.commit()
     return await _load_inspection(db, inspection.id)
 
@@ -435,6 +456,15 @@ async def inspection_result(
         result=body.result,
         inspection_id=inspection.id,
     )
+    if target == StageStatus.acceptance:
+        obj = await db.get(RepairObject, stage.object_id)
+        notes.notify(
+            db,
+            [obj.customer_id if obj else None],
+            "stage_acceptance",
+            stage=stage.title,
+            url=notes.url(f"/stages/{stage.id}"),
+        )
     await db.commit()
     return await _load_inspection(db, inspection.id)
 

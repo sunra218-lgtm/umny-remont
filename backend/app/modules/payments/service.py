@@ -15,8 +15,16 @@ from app.core.audit import audit
 from app.core.config import get_settings
 from app.core.problems import Problem
 from app.domain.statuses import ensure_transition
-from app.models import Act, Organization, Payment, RepairObject, Stage
-from app.models.enums import ActStatus, ObjectStatus, PaymentStatus, StageStatus
+from app.models import Act, Dispute, Organization, Payment, RepairObject, Stage
+from app.models.enums import (
+    ActStatus,
+    DisputeStatus,
+    ObjectStatus,
+    OrgRole,
+    PaymentStatus,
+    StageStatus,
+)
+from app.modules.notifications import service as notes
 from app.modules.payments.bank import BankEvent, Recipient, get_bank
 
 
@@ -64,8 +72,24 @@ async def apply_event(
                 db, "stage", stage, StageStatus.ready, "stage.funded", actor, payment_id=payment.id
             )
         obj = await db.get(RepairObject, payment.object_id, with_for_update=True)
-        if obj and obj.status == ObjectStatus.contracting:
+        if stage and obj and obj.status == ObjectStatus.contracting:
             _set(db, "object", obj, ObjectStatus.active, "object.activated", actor)
+        if stage and obj:
+            bosses = await notes.org_member_ids(
+                db, obj.contractor_org_id, [OrgRole.contractor_admin]
+            )
+            notes.notify(db, bosses, "hold_paid", stage=stage.title, address=obj.address_text)
+        if payment.purchase_order_id:
+            managers = await notes.platform_staff_ids(
+                db, [OrgRole.procurement_manager, OrgRole.platform_admin]
+            )
+            notes.notify(
+                db,
+                managers,
+                "order_paid",
+                amount=notes.rub(payment.amount_kop),
+                url=notes.url("/procurement"),
+            )
     elif event.status == "failed" and payment.status in (
         PaymentStatus.pending_funding,
         PaymentStatus.release_requested,
@@ -94,6 +118,28 @@ async def apply_event(
             _set(db, "act", act, ActStatus.released, "act.released", actor)
         if stage and stage.status == StageStatus.accepted:
             _set(db, "stage", stage, StageStatus.paid, "stage.paid", actor)
+        if stage:
+            obj = await db.get(RepairObject, payment.object_id)
+            assert obj is not None
+            bosses = await notes.org_member_ids(
+                db, obj.contractor_org_id, [OrgRole.contractor_admin]
+            )
+            notes.notify(
+                db,
+                [*bosses, obj.customer_id],
+                "payment_released",
+                stage=stage.title,
+                address=obj.address_text,
+            )
+    elif event.status == "frozen" and payment.status == PaymentStatus.held:
+        _set(db, "payment", payment, PaymentStatus.frozen, "payment.frozen", actor)
+    elif event.status == "unfrozen" and payment.status == PaymentStatus.frozen:
+        _set(db, "payment", payment, PaymentStatus.held, "payment.unfrozen", actor)
+    elif event.status == "refunded" and payment.status in (
+        PaymentStatus.frozen,
+        PaymentStatus.held,
+    ):
+        _set(db, "payment", payment, PaymentStatus.refunded, "payment.refunded", actor)
     payment.bank_payload = payload
     return payment
 
@@ -115,10 +161,31 @@ async def active_hold(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def open_dispute(db: AsyncSession, stage_id: uuid.UUID) -> Dispute | None:
+    return (
+        await db.execute(
+            select(Dispute)
+            .where(
+                Dispute.stage_id == stage_id,
+                Dispute.status.in_([DisputeStatus.open, DisputeStatus.in_review]),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def run(db: AsyncSession, event: BankEvent | None, actor: uuid.UUID | None) -> None:
+    """Банк ответил сразу (имитация) — применяем; иначе ответ придёт вебхуком."""
+    if event is not None:
+        await apply_event(db, event, actor)
+
+
 async def request_release(db: AsyncSession, act: Act, actor: uuid.UUID | None) -> Payment:
     """Выплата по подписанному обеими сторонами акту."""
     if act.status != ActStatus.signed_customer:
         raise Problem(409, "act-not-signed", "Акт ещё не подписан обеими сторонами")
+    if await open_dispute(db, act.stage_id) is not None:
+        raise Problem(409, "dispute-open", "По этапу открыт спор, выплата заморожена")
     payment = (
         await db.execute(
             select(Payment)
@@ -164,7 +231,5 @@ async def request_release(db: AsyncSession, act: Act, actor: uuid.UUID | None) -
         act_id=act.id,
     )
     await db.flush()
-    event = await get_bank().release(payment.id, recipients)
-    if event is not None:
-        await apply_event(db, event, actor)
+    await run(db, await get_bank().release(payment.id, recipients), actor)
     return payment

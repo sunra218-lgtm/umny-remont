@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, errorText } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { describeDevice, formatDate, formatPhone, ORG_TYPE_LABELS, ROLE_LABELS } from "@/lib/format";
-import type { Device, Me, OrgDevice } from "@/lib/types";
+import type { AppNotification, Device, Me, OrgDevice } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../components";
 
@@ -146,7 +146,34 @@ export default function CabinetPage() {
           ))}
         </ul>
       </section>
+      <Notifications />
     </Shell>
+  );
+}
+
+function Notifications() {
+  const [items, setItems] = useState<AppNotification[] | null>(null);
+  useEffect(() => {
+    api<AppNotification[]>("/me/notifications")
+      .then(setItems)
+      .catch(() => setItems([]));
+  }, []);
+  if (!items || items.length === 0) return null;
+  return (
+    <section className="card">
+      <h2>Последние СМС-уведомления</h2>
+      <ul className="list">
+        {items.map((n) => (
+          <li key={n.id}>
+            <span>{n.text}</span>
+            <span className="muted small nowrap">
+              {formatDate(n.created_at)}
+              {n.status === "queued" ? " · отправляется" : n.status === "failed" ? " · не доставлено" : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

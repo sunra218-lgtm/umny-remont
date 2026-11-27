@@ -102,6 +102,8 @@ export type RepairObject = {
     can_edit_estimates: boolean;
     can_manage_team: boolean;
     can_order_services: boolean;
+    can_buy?: boolean;
+    is_crew?: boolean;
   };
 };
 
@@ -244,6 +246,7 @@ export type Payment = {
   stage_id: string | null;
   object_id: string;
   act_id: string | null;
+  purchase_order_id: string | null;
   status: "created" | "pending_funding" | "held" | "release_requested" | "released" | "frozen" | "refunded" | "failed";
   amount_kop: number;
   breakdown: { work_kop?: number; material_kop?: number; platform_fee_kop?: number };
@@ -270,3 +273,86 @@ export type Act = {
   can_sign: boolean;
   can_reject: boolean;
 };
+
+export type Dispute = {
+  id: string;
+  object_id: string;
+  stage_id: string | null;
+  stage_title: string | null;
+  address: string | null;
+  opened_by: string;
+  opened_by_name: string | null;
+  reason: string;
+  status: "open" | "in_review" | "resolved" | "rejected";
+  outcome: "continue" | "refund" | null;
+  resolution: string | null;
+  stage_status_before: string | null;
+  payment_status: Payment["status"] | null;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export type MaterialRequest = {
+  id: string;
+  object_id: string;
+  address: string | null;
+  stage_id: string | null;
+  stage_title: string | null;
+  author_name: string | null;
+  text: string | null;
+  audio_url: string | null;
+  status: "new" | "in_work" | "done";
+  created_at: string;
+};
+
+export type OrderStatus =
+  | "draft"
+  | "proposed"
+  | "confirmed"
+  | "ordered"
+  | "delivering"
+  | "delivered"
+  | "partially_delivered"
+  | "expired"
+  | "rejected";
+
+export type PurchaseOrder = {
+  id: string;
+  object_id: string;
+  address: string | null;
+  stage_id: string | null;
+  stage_title: string | null;
+  request_id: string | null;
+  supplier_org_id: string | null;
+  supplier_name: string | null;
+  status: OrderStatus;
+  items: { id: string; title: string; sku: string | null; qty: string; unit_price_kop: number; total_kop: number }[];
+  total_kop: number;
+  supplier_cost_kop: number | null;
+  margin_kop: number | null;
+  comment: string | null;
+  reject_reason: string | null;
+  proposed_at: string | null;
+  expires_at: string | null;
+  confirmed_by_customer_at: string | null;
+  delivery_slot_at: string | null;
+  created_at: string;
+  payment: { id: string; status: Payment["status"]; pay_url: string | null } | null;
+  deliveries: {
+    id: string;
+    status: "pending" | "accepted" | "accepted_with_discrepancies" | "rejected";
+    delivered_at: string | null;
+    received_by_name: string | null;
+    discrepancies: { title: string; expected: string | null; received: string | null; comment: string | null }[];
+    comment: string | null;
+    invoice_url: string | null;
+  }[];
+  can_edit: boolean;
+  can_confirm: boolean;
+  can_order: boolean;
+  can_ship: boolean;
+  can_receive: boolean;
+  can_complete: boolean;
+};
+
+export type AppNotification = { id: string; text: string; status: "queued" | "sent" | "failed"; created_at: string };

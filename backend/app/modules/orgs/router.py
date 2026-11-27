@@ -80,7 +80,9 @@ async def list_orgs(
     limit: int = Query(default=50, ge=1, le=200),
 ) -> Page[OrgOut]:
     stmt = select(Organization).where(Organization.deleted_at.is_(None))
-    if not current.is_platform_admin:
+    # Менеджер закупок выбирает поставщика для корзины — ему виден список поставщиков.
+    buyer = type == OrgType.supplier and current.has_platform_role(OrgRole.procurement_manager)
+    if not current.is_platform_admin and not buyer:
         stmt = stmt.where(Organization.id.in_([o.id for _, o in current.memberships]))
     if type is not None:
         stmt = stmt.where(Organization.type == type)

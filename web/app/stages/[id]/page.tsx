@@ -12,13 +12,15 @@ import {
   INSPECTION_RESULT_LABELS,
   personName,
   ACT_STATUS_LABELS,
+  DISPUTE_OUTCOME_LABELS,
+  DISPUTE_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   REVIEW_LABELS,
   rub,
   STAGE_STATUS_LABELS,
   STAGE_TYPE_LABELS,
 } from "@/lib/format";
-import type { Act, Inspection, MediaItem, Me, Member, Page, Payment, Stage, StageChecklist } from "@/lib/types";
+import type { Act, Dispute, Inspection, MediaItem, Me, Member, Page, Payment, Stage, StageChecklist } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
 
@@ -31,6 +33,7 @@ type StageDetail = {
   can_review: boolean;
   is_admin: boolean;
   is_customer: boolean;
+  can_dispute: boolean;
 };
 
 export default function StagePage() {
@@ -79,6 +82,7 @@ export default function StagePage() {
       <ErrorNote text={error} />
       <div className="split">
         <div>
+          <Disputes detail={detail} onChanged={load} />
           <Money detail={detail} onChanged={load} />
           <Acts detail={detail} onChanged={load} />
           <Actions detail={detail} checklist={checklist} onChanged={load} />
@@ -599,6 +603,148 @@ function Acts({ detail, onChanged }: { detail: StageDetail; onChanged: () => Pro
             Сформировать акт
           </button>
         </>
+      )}
+      <ErrorNote text={error} />
+    </section>
+  );
+}
+
+const DISPUTABLE = ["funding", "ready", "in_progress", "inspection", "acceptance", "accepted"];
+
+function Disputes({ detail, onChanged }: { detail: StageDetail; onChanged: () => Promise<void> }) {
+  const [items, setItems] = useState<Dispute[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [reason, setReason] = useState("");
+  const [outcome, setOutcome] = useState<"continue" | "refund">("continue");
+  const [resolution, setResolution] = useState("");
+  const [busy, setBusy] = useState(false);
+  const { stage } = detail;
+
+  const load = useCallback(async () => {
+    try {
+      const all = await api<Dispute[]>(`/objects/${detail.object_id}/disputes`);
+      setItems(all.filter((d) => d.stage_id === stage.id));
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [detail.object_id, stage.id]);
+  useEffect(() => void load(), [load, stage.status]);
+
+  async function run(path: string, body: unknown) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api<Dispute>(path, { method: "POST", body });
+      setOpening(false);
+      setReason("");
+      setResolution("");
+      await Promise.all([load(), onChanged()]);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (items === null) return null;
+  const open = items.find((d) => d.status === "open" || d.status === "in_review");
+  const canOpen = detail.can_dispute && !open && DISPUTABLE.includes(stage.status);
+  if (!open && items.length === 0 && !canOpen) return null;
+
+  return (
+    <section className="card">
+      <h2>Спор по этапу</h2>
+      {items.map((d) => {
+        const active = d.status === "open" || d.status === "in_review";
+        return (
+          <div key={d.id} className={active ? "dispute" : "dispute closed"}>
+            <p>
+              <span className={`status ${active ? "status-frozen" : "status-approved"}`}>{DISPUTE_STATUS_LABELS[d.status]}</span>{" "}
+              <span className="muted small">
+                {d.opened_by_name}, {formatDate(d.created_at)}
+              </span>
+            </p>
+            <p>{d.reason}</p>
+            {active && (
+              <p className="muted small">
+                Работы и выплата по этапу на паузе{d.payment_status === "frozen" ? ", деньги заморожены в банке" : ""}. Спор разбирает
+                администратор платформы.
+              </p>
+            )}
+            {d.outcome && (
+              <p>
+                <b>{DISPUTE_OUTCOME_LABELS[d.outcome]}.</b> {d.resolution}
+              </p>
+            )}
+            {active && detail.is_admin && (
+              <form
+                className="stack"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void run(`/disputes/${d.id}/resolve`, { outcome, resolution });
+                }}
+              >
+                {d.status === "open" && (
+                  <button type="button" className="secondary" disabled={busy} onClick={() => void run(`/disputes/${d.id}/review`, {})}>
+                    Взять в работу
+                  </button>
+                )}
+                <fieldset>
+                  <legend>Решение</legend>
+                  <div className="radio-row">
+                    <label>
+                      <input type="radio" name={`outcome-${d.id}`} checked={outcome === "continue"} onChange={() => setOutcome("continue")} />
+                      Продолжить работы
+                    </label>
+                    <label>
+                      <input type="radio" name={`outcome-${d.id}`} checked={outcome === "refund"} onChange={() => setOutcome("refund")} />
+                      Вернуть деньги заказчику
+                    </label>
+                  </div>
+                </fieldset>
+                <label>
+                  Обоснование для сторон
+                  <textarea value={resolution} onChange={(e) => setResolution(e.target.value)} minLength={5} required />
+                </label>
+                <button className="primary" disabled={busy}>
+                  {outcome === "refund" ? "Вернуть деньги и закрыть спор" : "Снять заморозку и закрыть спор"}
+                </button>
+              </form>
+            )}
+          </div>
+        );
+      })}
+      {canOpen && !opening && (
+        <>
+          <p className="muted">Если что-то пошло не так и договориться не получается, откройте спор. Деньги этапа заморозятся до решения.</p>
+          <button className="secondary" onClick={() => setOpening(true)}>
+            Открыть спор
+          </button>
+        </>
+      )}
+      {opening && (
+        <form
+          className="stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(`/objects/${detail.object_id}/disputes`, { stage_id: stage.id, reason });
+          }}
+        >
+          <label>
+            Что случилось
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} minLength={10} required placeholder="Например: стяжка с перепадом 2 см, бригада отказывается переделать" />
+          </label>
+          <p className="muted small">Пока спор открыт, работы по этапу не принимаются и деньги никому не уходят.</p>
+          <div className="row">
+            <button className="primary" disabled={busy}>
+              Открыть спор и заморозить деньги
+            </button>
+            <button type="button" className="secondary" onClick={() => setOpening(false)}>
+              Отмена
+            </button>
+          </div>
+        </form>
       )}
       <ErrorNote text={error} />
     </section>

@@ -1,0 +1,114 @@
+"""Фоновые задачи: `python -m app.jobs worker` (постоянно) или разовый запуск одной задачи.
+
+python -m app.jobs send       — отправить очередь СМС
+python -m app.jobs expire     — закрыть корзины, не подтверждённые за 24 часа
+python -m app.jobs reminders  — напомнить бригадам об отчёте за сегодня (обычно в 18:00)
+python -m app.jobs worker     — всё вместе: очередь раз в 5 секунд, напоминания в 18:00 МСК
+"""
+
+import asyncio
+import logging
+import sys
+from datetime import datetime, time
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.db import get_session
+from app.core.security import utcnow
+from app.models import MediaReport, Notification, ObjectAssignment, RepairObject
+from app.models.enums import AssignmentRole, ObjectStatus
+from app.modules.notifications import service as notes
+from app.modules.notifications.service import MSK
+from app.modules.procurement.router import expire_orders
+
+log = logging.getLogger("umny.jobs")
+REMINDER_HOUR = 18
+
+
+async def daily_reminders(db: AsyncSession, now: datetime | None = None) -> int:
+    """Прорабам активных объектов, по которым сегодня ещё нет ни одного фото.
+    В СМС — ссылка на приложение бригады, а не токен входа (ТЗ 6.1)."""
+    now = now or utcnow()
+    day = now.astimezone(MSK).date()
+    day_start = datetime.combine(day, time(0), MSK)
+    with_reports = (
+        select(MediaReport.object_id)
+        .where(MediaReport.received_server_at >= day_start)
+        .group_by(MediaReport.object_id)
+    )
+    rows = await db.execute(
+        select(ObjectAssignment.user_id, RepairObject.id, RepairObject.address_text)
+        .join(RepairObject, RepairObject.id == ObjectAssignment.object_id)
+        .where(
+            ObjectAssignment.role == AssignmentRole.foreman,
+            RepairObject.status == ObjectStatus.active,
+            RepairObject.deleted_at.is_(None),
+            RepairObject.id.notin_(with_reports),
+        )
+    )
+    n = 0
+    for user_id, object_id, address in rows.all():
+        already = await db.scalar(
+            select(func.count())
+            .select_from(Notification)
+            .where(
+                Notification.user_id == user_id,
+                Notification.template == "daily_reminder",
+                Notification.payload["object_id"].astext == str(object_id),
+                Notification.payload["day"].astext == day.isoformat(),
+            )
+        )
+        if already:
+            continue
+        n += notes.notify(
+            db,
+            [user_id],
+            "daily_reminder",
+            address=address,
+            url=notes.url("/lite"),
+            object_id=object_id,
+            day=day.isoformat(),
+        )
+    await db.commit()
+    return n
+
+
+async def _with_db(job):  # type: ignore[no-untyped-def]
+    async for db in get_session():
+        return await job(db)
+
+
+async def worker() -> None:
+    log.warning("Фоновый процесс запущен")
+    while True:
+        try:
+            await _with_db(notes.send_queued)
+            await _with_db(expire_orders)
+            if utcnow().astimezone(MSK).hour == REMINDER_HOUR:
+                await _with_db(daily_reminders)
+        except Exception:
+            log.exception("Ошибка фоновой задачи")
+        await asyncio.sleep(5)
+
+
+JOBS = {
+    "send": notes.send_queued,
+    "expire": expire_orders,
+    "reminders": daily_reminders,
+}
+
+
+def main(argv: list[str]) -> None:
+    logging.basicConfig(level=logging.INFO)
+    name = argv[1] if len(argv) > 1 else "worker"
+    if name == "worker":
+        asyncio.run(worker())
+    elif name in JOBS:
+        print(asyncio.run(_with_db(JOBS[name])))
+    else:
+        raise SystemExit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

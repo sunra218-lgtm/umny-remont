@@ -2,7 +2,7 @@
 
 Платформа работает с банком через этот интерфейс. Сейчас подключена имитация `FakeBank`:
 резерв «оплачивается» на тестовой странице сайта, выплата проходит сразу. Настоящий банк
-(Т-Банк, Точка, ЮKassa — выбирает владелец проекта) добавляется ещё одним классом с теми же
+(выбран Т-Банк) добавляется ещё одним классом с теми же
 методами; остальной код не меняется. Итоги операций банк присылает вебхуком `/webhooks/bank`.
 """
 
@@ -38,7 +38,7 @@ class BankEvent:
 
     event_id: str
     payment_id: uuid.UUID
-    status: str  # held | released | failed | refunded
+    status: str  # held | released | failed | frozen | unfrozen | refunded
     bank_op_id: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
 
@@ -52,6 +52,18 @@ class BankGateway(Protocol):
 
     async def release(self, payment_id: uuid.UUID, recipients: list[Recipient]) -> BankEvent | None:
         """Выплата из резерва. Настоящий банк ответит вебхуком; имитация — сразу."""
+        ...
+
+    async def freeze(self, payment_id: uuid.UUID) -> BankEvent | None:
+        """Заморозка резерва на время спора: деньги не уходят ни одной стороне."""
+        ...
+
+    async def unfreeze(self, payment_id: uuid.UUID) -> BankEvent | None:
+        """Снятие заморозки: резерв снова доступен для выплаты по акту."""
+        ...
+
+    async def refund(self, payment_id: uuid.UUID, amount_kop: int) -> BankEvent | None:
+        """Возврат резерва заказчику."""
         ...
 
 
@@ -73,6 +85,19 @@ class FakeBank:
             status="released",
             bank_op_id=f"fake-release-{payment_id}",
             payload={"recipients": [r.__dict__ for r in recipients]},
+        )
+
+    async def freeze(self, payment_id: uuid.UUID) -> BankEvent | None:
+        return BankEvent(f"fake-freeze-{payment_id}-{utcnow().timestamp()}", payment_id, "frozen")
+
+    async def unfreeze(self, payment_id: uuid.UUID) -> BankEvent | None:
+        return BankEvent(
+            f"fake-unfreeze-{payment_id}-{utcnow().timestamp()}", payment_id, "unfrozen"
+        )
+
+    async def refund(self, payment_id: uuid.UUID, amount_kop: int) -> BankEvent | None:
+        return BankEvent(
+            f"fake-refund-{payment_id}", payment_id, "refunded", payload={"amount_kop": amount_kop}
         )
 
 

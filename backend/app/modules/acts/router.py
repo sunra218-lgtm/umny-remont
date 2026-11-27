@@ -25,6 +25,7 @@ from app.models.enums import (
     SignedDocumentType,
     StageStatus,
 )
+from app.modules.notifications import service as notes
 from app.modules.payments import service as payments
 from app.modules.signing.service import confirm_signature, request_signature
 
@@ -139,7 +140,39 @@ async def _load_act(
     act = await db.get(Act, act_id, with_for_update=True)
     if act is None:
         raise Problem(404, "not-found", "Акт не найден")
-    return act, await load_object(db, current, act.object_id)
+    access = await load_object(db, current, act.object_id)
+    stage_status = await db.scalar(select(Stage.status).where(Stage.id == act.stage_id))
+    if stage_status == StageStatus.frozen:
+        raise Problem(409, "dispute-open", "По этапу открыт спор, акт на паузе")
+    return act, access
+
+
+async def cancel_open_acts(
+    db: DbSession, stage_id: uuid.UUID, actor: uuid.UUID, reason: str
+) -> None:
+    """Акты, которые ещё не подписал заказчик, отменяются (например, после возврата денег)."""
+    rows = await db.execute(
+        select(Act)
+        .where(
+            Act.stage_id == stage_id,
+            Act.status.in_([ActStatus.sent, ActStatus.signed_contractor]),
+        )
+        .with_for_update()
+    )
+    for act in rows.scalars():
+        old = act.status
+        ensure_transition("act", act.status, ActStatus.rejected)
+        act.status = ActStatus.rejected
+        act.reject_reason = reason
+        audit(
+            db,
+            entity_type="act",
+            entity_id=act.id,
+            action="act.cancelled",
+            actor_id=actor,
+            old={"status": old},
+            new={"status": act.status, "reason": reason},
+        )
 
 
 @router.post(
@@ -286,6 +319,15 @@ async def sign_confirm(
             "document_hash": signature.document_hash,
         },
     )
+    if role == "contractor":
+        stage = await db.get(Stage, act.stage_id)
+        notes.notify(
+            db,
+            [access.obj.customer_id],
+            "act_to_sign",
+            stage=stage.title if stage else "",
+            url=notes.url(f"/stages/{act.stage_id}"),
+        )
     if role == "customer":
         stage = await db.get(Stage, act.stage_id, with_for_update=True)
         assert stage is not None

@@ -30,6 +30,7 @@ services:
 
   backend:
     build: ./backend
+    image: umny-remont-backend
     env_file:
       - path: .env
         required: false
@@ -56,6 +57,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Фоновый процесс: отправка СМС из очереди, сгорание корзин через 24 часа, напоминание в 18:00.
+  worker:
+    image: umny-remont-backend
+    pull_policy: never
+    command: ["python", "-m", "app.jobs", "worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://umny:umny@db:5432/umny
+      REDIS_URL: redis://redis:6379/0
+      ENV: ${ENV:-dev}
+    depends_on:
+      backend:
+        condition: service_healthy
 
   web:
     build:

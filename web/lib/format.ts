@@ -183,3 +183,45 @@ export const ACT_STATUS_LABELS: Record<string, string> = {
   released: "Подписан и оплачен",
   rejected: "Отклонён",
 };
+
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  draft: "Черновик корзины",
+  proposed: "Ждёт подтверждения заказчика",
+  confirmed: "Подтверждён, ждёт оплаты",
+  ordered: "Заказан у поставщика",
+  delivering: "В доставке",
+  delivered: "Доставлен",
+  partially_delivered: "Доставлен с расхождениями",
+  expired: "Не подтверждён вовремя",
+  rejected: "Заказчик отказался",
+};
+
+export const DELIVERY_STATUS_LABELS: Record<string, string> = {
+  pending: "Ожидается",
+  accepted: "Принята",
+  accepted_with_discrepancies: "Принята с расхождениями",
+  rejected: "Не принята",
+};
+
+export const DISPUTE_STATUS_LABELS: Record<string, string> = {
+  open: "Открыт",
+  in_review: "На разборе",
+  resolved: "Решён",
+  rejected: "Отклонён",
+};
+
+export const DISPUTE_OUTCOME_LABELS: Record<string, string> = {
+  continue: "Работы продолжаются",
+  refund: "Деньги возвращены заказчику",
+};
+
+export const REQUEST_STATUS_LABELS: Record<string, string> = {
+  new: "Новая",
+  in_work: "В работе",
+  done: "Выполнена",
+};
+
+/** Количество без лишних нулей: «2.500» → «2,5». */
+export function qty(value: string | number): string {
+  return Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 3 });
+}

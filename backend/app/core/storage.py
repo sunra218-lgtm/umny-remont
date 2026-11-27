@@ -109,3 +109,22 @@ def check_media_link(media_id: uuid.UUID, exp: int, viewer: uuid.UUID, sig: str)
     if exp < int(time.time()):
         return False
     return hmac.compare_digest(sig, _link_sig(media_id, exp, viewer))
+
+
+def _file_sig(kind: str, file_id: uuid.UUID, exp: int, viewer: uuid.UUID) -> str:
+    key = get_settings().jwt_secret.encode()
+    msg = f"file:{kind}:{file_id}:{exp}:{viewer}".encode()
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()[:32]
+
+
+def signed_file_url(kind: str, file_id: uuid.UUID, viewer: uuid.UUID) -> str:
+    """Подписанная ссылка на служебный файл (накладная, голосовая заявка), 15 минут."""
+    exp = int(time.time()) + get_settings().media_link_ttl_s
+    sig = _file_sig(kind, file_id, exp, viewer)
+    return f"/api/v1/files/{kind}/{file_id}?exp={exp}&v={viewer}&sig={sig}"
+
+
+def check_file_link(kind: str, file_id: uuid.UUID, exp: int, viewer: uuid.UUID, sig: str) -> bool:
+    if exp < int(time.time()):
+        return False
+    return hmac.compare_digest(sig, _file_sig(kind, file_id, exp, viewer))
