@@ -44,6 +44,7 @@ import { ErrorNote, Loading, Shell } from "../../components";
 import { Cameras } from "../../cameras";
 import { ObjectMarket } from "../../market";
 import { DesignEntry } from "../../design";
+import { LuxSection } from "../../lux";
 import { DailyPlans } from "../../daily";
 import { BasketForm, OrderCard } from "../../orders";
 
@@ -101,6 +102,7 @@ export default function ObjectPage() {
         </div>
         <div>
           <ObjectInfo obj={obj} onChanged={load} />
+          <LuxSection obj={obj} onChanged={load} />
           <Team obj={obj} me={me} />
           <Cameras obj={obj} />
         </div>

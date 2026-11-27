@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     content_factory_url: str | None = None
     content_factory_key: str | None = None
 
+    # «Люкс ремонт»: поиск мебели у поставщиков-партнёров и расчёт доставки.
+    # Пока адреса не заданы, ищем по своему каталогу, а доставку считаем по тарифам платформы.
+    furniture_search_url: str | None = None
+    furniture_search_key: str | None = None
+    logistics_url: str | None = None
+    logistics_key: str | None = None
+
     # Камеры на объекте: сколько хранить кадры и сколько ждать снимок с IP-камеры.
     camera_retention_days: int = 90
     camera_fetch_timeout_s: float = 10.0

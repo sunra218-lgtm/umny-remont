@@ -24,6 +24,7 @@ export function Header() {
             <Link href="/procurement">Закупки</Link>
           )}
           {(me.is_platform_admin || me.memberships.some((m) => m.org_type !== "supplier")) && <Link href="/techcards">Техкарты</Link>}
+          {(me.is_platform_admin || me.memberships.some((m) => m.role === "procurement_manager")) && <Link href="/lux">Люкс</Link>}
           <Link href="/cabinet">Кабинет</Link>
           {me.is_platform_admin && <Link href="/admin">Админка</Link>}
           <button type="button" className="link" onClick={() => void signOut().then(() => location.assign("/login"))}>

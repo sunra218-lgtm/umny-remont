@@ -7,6 +7,7 @@ python -m app.jobs cameras    — забрать кадры с IP-камер
 python -m app.jobs purge      — удалить старые кадры камер
 python -m app.jobs renders    — картинки комнат дизайн-проекта
 python -m app.jobs videos     — статус роликов контент-завода
+python -m app.jobs tracking   — отметки пути заказов мебели
 python -m app.jobs worker     — всё вместе: очередь раз в 5 секунд, камеры раз в минуту,
                                 напоминания в 18:00 МСК, чистка кадров раз в час
 """
@@ -26,6 +27,7 @@ from app.models import MediaReport, Notification, ObjectAssignment, RepairObject
 from app.models.enums import AssignmentRole, ObjectStatus
 from app.modules.cameras.service import capture_ip_cameras, purge_old_frames
 from app.modules.design.jobs import poll_videos, process_renders
+from app.modules.lux.jobs import poll_tracking
 from app.modules.notifications import service as notes
 from app.modules.notifications.service import MSK
 from app.modules.procurement.router import expire_orders
@@ -112,6 +114,8 @@ async def worker() -> None:
                 await _with_db(process_renders)
             if every("videos", 60):
                 await _with_db(poll_videos)
+            if every("tracking", 1800):
+                await _with_db(poll_tracking)
         except Exception:
             log.exception("Ошибка фоновой задачи")
         await asyncio.sleep(5)
@@ -125,6 +129,7 @@ JOBS = {
     "purge": purge_old_frames,
     "renders": process_renders,
     "videos": poll_videos,
+    "tracking": poll_tracking,
 }
 
 

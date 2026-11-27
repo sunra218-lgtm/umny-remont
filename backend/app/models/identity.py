@@ -61,6 +61,8 @@ class Organization(UUIDPk, Timestamps, SoftDelete, Base):
     rating: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
     sla_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # VIP-подрядчик: только такие берут объекты пакета «Люкс».
+    vip_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     members: Mapped[list["OrgMember"]] = relationship(back_populates="org", lazy="raise")
 

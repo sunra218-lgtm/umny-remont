@@ -12,6 +12,7 @@ from app.models.identity import (
     User,
 )
 from app.models.knowledge import DailyPlan, DailyPlanItem, EngineerQuestion, TechCard
+from app.models.lux import FurnitureEvent, FurnitureItem, FurnitureOrder, FurnitureOrderItem
 from app.models.market import (
     ContractorProfile,
     ContractorReview,
@@ -49,6 +50,10 @@ __all__ = [
     "DesignMaterial",
     "DesignProject",
     "DesignRender",
+    "FurnitureEvent",
+    "FurnitureItem",
+    "FurnitureOrder",
+    "FurnitureOrderItem",
     "ContractorProfile",
     "ContractorReview",
     "MarketBid",

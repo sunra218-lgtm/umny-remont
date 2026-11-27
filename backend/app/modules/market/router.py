@@ -91,6 +91,7 @@ class ContractorCard(BaseModel):
     objects_done: int
     objects_in_work: int
     cover_url: str | None
+    vip: bool = False
 
 
 class PortfolioOut(BaseModel):
@@ -192,6 +193,7 @@ async def _cards(
                 objects_done=d,
                 objects_in_work=w,
                 cover_url=signed_file_url("portfolio", cover, viewer) if cover else None,
+                vip=org.vip_at is not None,
             )
         )
     return out
@@ -204,6 +206,7 @@ async def catalog(
     work_type: str | None = None,
     kind: Literal["company", "brigade"] | None = None,
     q: str | None = Query(default=None, max_length=100),
+    vip: bool = False,
 ) -> list[ContractorCard]:
     stmt = (
         select(Organization)
@@ -222,6 +225,8 @@ async def catalog(
         stmt = stmt.where(ContractorProfile.kind == "brigade")
     elif kind == "company":
         stmt = stmt.where((ContractorProfile.kind == "company") | ContractorProfile.id.is_(None))
+    if vip:
+        stmt = stmt.where(Organization.vip_at.is_not(None))
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -232,7 +237,7 @@ async def catalog(
     orgs = list((await db.execute(stmt)).scalars())
     cards = await _cards(db, orgs, current.id)
     # Сначала с оценками и опытом на платформе.
-    cards.sort(key=lambda c: (-(c.rating or 0), -c.objects_done, c.name))
+    cards.sort(key=lambda c: (not c.vip, -(c.rating or 0), -c.objects_done, c.name))
     return cards
 
 
@@ -482,6 +487,8 @@ class TaskOut(BaseModel):
     # Заказчику и администратору — все отклики, подрядчику — только свой.
     bids: list[BidOut]
     my_bid: BidOut | None = None
+    # Пакет «Люкс»: откликаются только VIP-подрядчики.
+    lux: bool = False
 
 
 async def _task_of(db: DbSession, object_id: uuid.UUID) -> MarketTask | None:
@@ -549,6 +556,7 @@ async def _task_out(db: DbSession, task: MarketTask, current: CurrentUser, owner
         bids_count=sum(1 for b in bids if b.status != "withdrawn"),
         bids=await _bid_outs(db, bids, current.id, True) if owner else [],
         my_bid=my_out,
+        lux=bool(obj and obj.package == "lux"),
     )
 
 
@@ -603,7 +611,7 @@ async def put_task(
     if first:
         notes.notify(
             db,
-            await _bidder_ids(db, body.work_types),
+            await _bidder_ids(db, body.work_types, vip_only=obj.package == "lux"),
             "market_task",
             area=task.area_hint,
             url=notes.url("/market"),
@@ -612,7 +620,9 @@ async def put_task(
     return await _task_out(db, task, current, True)
 
 
-async def _bidder_ids(db: DbSession, work_types: list[str]) -> list[uuid.UUID]:
+async def _bidder_ids(
+    db: DbSession, work_types: list[str], vip_only: bool = False
+) -> list[uuid.UUID]:
     """Руководители проверенных подрядчиков, которые берут заявки и делают такие работы."""
     stmt = (
         select(OrgMember.user_id)
@@ -626,6 +636,8 @@ async def _bidder_ids(db: DbSession, work_types: list[str]) -> list[uuid.UUID]:
             (ContractorProfile.id.is_(None)) | ContractorProfile.accepts_tasks.is_(True),
         )
     )
+    if vip_only:
+        stmt = stmt.where(Organization.vip_at.is_not(None))
     if work_types:
         # Без профиля — шлём всем; с профилем — если есть хотя бы один нужный вид работ.
         stmt = stmt.where(
@@ -667,14 +679,17 @@ async def open_tasks(current: Auth, db: DbSession) -> list[TaskOut]:
             "Заявки видят проверенные подрядчики",
             "Пройдите проверку организации у администратора платформы.",
         )
-    tasks = (
-        await db.execute(
-            select(MarketTask)
-            .where(MarketTask.status == "open")
-            .order_by(MarketTask.created_at.desc())
-            .limit(100)
-        )
-    ).scalars()
+    stmt = (
+        select(MarketTask)
+        .join(RepairObject, RepairObject.id == MarketTask.object_id)
+        .where(MarketTask.status == "open")
+        .order_by(MarketTask.created_at.desc())
+        .limit(100)
+    )
+    vip = any(o.vip_at for o in _verified_contractors(current, BIDDER_ROLES))
+    if not (current.is_platform_admin or vip):
+        stmt = stmt.where(RepairObject.package != "lux")
+    tasks = (await db.execute(stmt)).scalars()
     return [await _task_out(db, t, current, False) for t in tasks]
 
 
@@ -705,6 +720,9 @@ async def bid(
         raise Problem(404, "not-found", "Заявка не найдена")
     if task.status != "open":
         raise Problem(409, "task-closed", "Заявка уже закрыта")
+    task_obj = await db.get(RepairObject, task.object_id)
+    if task_obj is not None and task_obj.package == "lux" and org.vip_at is None:
+        raise Problem(403, "not-vip", "На ремонт «Люкс» откликаются VIP-подрядчики")
     existing = (
         await db.execute(
             select(MarketBid).where(MarketBid.task_id == task.id, MarketBid.org_id == org.id)
@@ -784,6 +802,8 @@ async def accept(bid_id: uuid.UUID, current: Auth, request: Request, db: DbSessi
     org = await _contractor(db, b.org_id)
     if org.verified_at is None:
         raise Problem(409, "org-not-verified", "Подрядчик ещё не прошёл проверку")
+    if obj.package == "lux" and org.vip_at is None:
+        raise Problem(409, "contractor-not-vip", "Для «Люкс» выберите VIP-подрядчика")
     now = utcnow()
     others = list(
         (

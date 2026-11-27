@@ -30,6 +30,7 @@ export function ContractorSummary({ c, link = true }: { c: ContractorCard; link?
       )}
       <div className="grow">
         {link ? <Link href={`/contractors/${c.org_id}`}><b>{c.name}</b></Link> : <b>{c.name}</b>}
+        {c.vip && <span className="badge lux-badge">VIP</span>}
         <div className="muted small">
           {KIND_LABELS[c.kind]}
           {c.city && ` · ${c.city}`}

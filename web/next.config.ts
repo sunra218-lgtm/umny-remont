@@ -9,7 +9,8 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // Фото мебели из каталогов фабрик-партнёров (только https).
+  "img-src 'self' data: blob: https:",
   // Ролики дизайн-проекта отдаёт внешний контент-завод (только https).
   "media-src 'self' blob: https:",
   "connect-src 'self'",

@@ -68,6 +68,7 @@ async def object_out(db: DbSession, obj: RepairObject, flags: dict[str, bool]) -
         contractor_org_id=obj.contractor_org_id,
         contractor_name=org.legal_name if org else None,
         match_mode=obj.match_mode,
+        package=obj.package,
         created_at=obj.created_at,
         access=flags,
     )
@@ -217,6 +218,12 @@ async def set_contractor(
                 "org-not-verified",
                 "Сначала проверьте подрядчика",
                 "Назначать можно только проверенные организации.",
+            )
+        if obj.package == "lux" and org.vip_at is None:
+            raise Problem(
+                409,
+                "contractor-not-vip",
+                "На объект «Люкс» назначаются только VIP-подрядчики",
             )
     old = obj.contractor_org_id
     obj.contractor_org_id = body.contractor_org_id

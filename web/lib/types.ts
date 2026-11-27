@@ -97,6 +97,7 @@ export type RepairObject = {
   contractor_org_id: string | null;
   contractor_name: string | null;
   match_mode?: "platform" | "market";
+  package?: "standard" | "lux";
   created_at: string;
   access: {
     is_customer: boolean;
@@ -571,6 +572,7 @@ export type ContractorCard = {
   objects_done: number;
   objects_in_work: number;
   cover_url: string | null;
+  vip?: boolean;
 };
 
 export type ContractorFull = ContractorCard & {
@@ -594,6 +596,7 @@ export type MarketBid = {
 
 export type MarketTask = {
   id: string;
+  lux?: boolean;
   object_id: string;
   title: string;
   description: string | null;
