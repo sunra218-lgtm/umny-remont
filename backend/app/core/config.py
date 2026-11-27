@@ -1,0 +1,65 @@
+from functools import lru_cache
+from typing import Annotated, Literal
+
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+DEV_JWT_SECRET = "dev-only-secret-change-me-in-production-0123456789"  # noqa: S105
+
+
+class Settings(BaseSettings):
+    """Настройки приложения. Все значения читаются из переменных окружения."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    env: Literal["dev", "test", "prod"] = "dev"
+    database_url: str = "postgresql+asyncpg://umny:umny@localhost:5432/umny"
+    redis_url: str = "redis://localhost:6379/0"
+
+    jwt_secret: str = DEV_JWT_SECRET
+    access_token_ttl_s: int = 15 * 60
+    refresh_token_ttl_s: int = 30 * 24 * 3600
+
+    otp_ttl_s: int = 5 * 60
+    otp_resend_cooldown_s: int = 60
+    otp_max_per_hour: int = 5
+    otp_max_attempts: int = 5
+    otp_max_per_ip_hour: int = 30
+    # В режиме разработки код из СМС возвращается в ответе API и показывается на экране.
+    otp_debug: bool = False
+
+    sms_provider: Literal["console"] = "console"
+
+    cookie_secure: bool = False
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    # Телефоны, которые при входе автоматически получают роль администратора платформы.
+    bootstrap_admin_phones: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    platform_inn: str = "0000000000"
+    platform_legal_name: str = "ООО «Умный ремонт»"
+
+    consent_text_version: str = "2026-11-v1"
+    idempotency_ttl_s: int = 24 * 3600
+
+    @field_validator("cors_origins", "bootstrap_admin_phones", mode="before")
+    @classmethod
+    def _split_csv(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @model_validator(mode="after")
+    def _check_prod(self) -> "Settings":
+        if self.env == "prod":
+            if self.jwt_secret == DEV_JWT_SECRET or len(self.jwt_secret) < 32:
+                raise ValueError("В prod нужен собственный JWT_SECRET длиной от 32 символов")
+            if self.otp_debug:
+                raise ValueError("OTP_DEBUG нельзя включать в prod")
+            if not self.cookie_secure:
+                raise ValueError("В prod COOKIE_SECURE должен быть true")
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

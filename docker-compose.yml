@@ -1,0 +1,67 @@
+# Локальный запуск всей платформы: docker compose up --build
+# Сайт: http://localhost:3000   API и документация: http://localhost:8000/api/docs
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: umny
+      POSTGRES_PASSWORD: umny
+      POSTGRES_DB: umny
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umny -d umny"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://umny:umny@db:5432/umny
+      REDIS_URL: redis://redis:6379/0
+      ENV: ${ENV:-dev}
+      OTP_DEBUG: ${OTP_DEBUG:-true}
+      BOOTSTRAP_ADMIN_PHONES: ${BOOTSTRAP_ADMIN_PHONES:-+79990000001}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: ./web
+      args:
+        BACKEND_URL: http://backend:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

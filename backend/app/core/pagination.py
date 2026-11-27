@@ -1,0 +1,12 @@
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+
+class Page(BaseModel, Generic[T]):
+    """Курсорная пагинация: next_cursor передаётся в следующий запрос как ?cursor=."""
+
+    items: list[T]
+    next_cursor: str | None = None
