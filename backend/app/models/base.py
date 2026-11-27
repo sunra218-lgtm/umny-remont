@@ -21,11 +21,12 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING)
 
 
-def pg_enum(enum_cls: type[enum.Enum], name: str) -> Enum:
+def pg_enum(enum_cls: type[enum.Enum], name: str, create_type: bool = True) -> Enum:
     """ENUM в PostgreSQL, хранит значения (а не имена) элементов Python-перечисления."""
     return Enum(
         enum_cls,
         name=name,
+        create_type=create_type,
         values_callable=lambda e: [member.value for member in e],
         validate_strings=True,
     )

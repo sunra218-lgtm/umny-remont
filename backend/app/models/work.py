@@ -19,6 +19,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -116,6 +117,10 @@ class ServiceOrder(UUIDPk, Timestamps, Base):
         default=ServiceOrderStatus.created,
     )
     report_document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    customer_comment: Mapped[str | None] = mapped_column(Text)
+    result_notes: Mapped[str | None] = mapped_column(Text)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Stage(UUIDPk, Timestamps, SoftDelete, Base):
@@ -159,8 +164,28 @@ class Estimate(UUIDPk, Timestamps, SoftDelete, Base):
     total_material_kop: Mapped[int] = money()
     reserve_kop: Mapped[int] = money()
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    # Сметчик отправил версию заказчику; после этого позиции не меняются.
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_signature_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("signatures.id"))
+
+
+class PriceItem(UUIDPk, Timestamps, Base):
+    """Справочник расценок: шаблоны работ и материалов, из которых собирается смета."""
+
+    __tablename__ = "price_items"
+
+    category: Mapped[EstimateItemCategory] = mapped_column(
+        pg_enum(EstimateItemCategory, "estimate_item_category", create_type=False), nullable=False
+    )
+    stage_type: Mapped[str | None] = mapped_column(String(50), index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    unit_price_kop: Mapped[int] = money()
+    sku: Mapped[str | None] = mapped_column(String(100))
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
 
 
 class EstimateItem(UUIDPk, Base):
@@ -180,6 +205,8 @@ class EstimateItem(UUIDPk, Base):
     qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     unit_price_kop: Mapped[int] = money()
     sku_id: Mapped[str | None] = mapped_column(String(100))
+    price_item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("price_items.id"))
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class ChecklistTemplate(UUIDPk, Timestamps, Base):

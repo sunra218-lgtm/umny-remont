@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     platform_inn: str = "0000000000"
     platform_legal_name: str = "ООО «Умный ремонт»"
 
+    # Цены выездов по умолчанию (бизнес-план 2.3: 5,9–8,9 тыс. ₽).
+    # Админ может изменить цену при назначении выезда.
+    price_acceptance_kop: int = 740_000
+    price_survey_kop: int = 740_000
+
     consent_text_version: str = "2026-11-v1"
     idempotency_ttl_s: int = 24 * 3600
 

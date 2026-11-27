@@ -59,11 +59,12 @@ export async function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-type Options = { method?: string; body?: unknown; retry?: boolean };
+type Options = { method?: string; body?: unknown; form?: FormData; retry?: boolean };
 
-export async function api<T>(path: string, { method = "GET", body, retry = true }: Options = {}): Promise<T> {
+export async function api<T>(path: string, { method = "GET", body, form, retry = true }: Options = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (form) method = method === "GET" ? "POST" : method;
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   if (method !== "GET") headers["Idempotency-Key"] = crypto.randomUUID();
 
@@ -72,7 +73,7 @@ export async function api<T>(path: string, { method = "GET", body, retry = true 
     resp = await fetch(`/api/v1${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
       credentials: "same-origin",
     });
   } catch {
@@ -85,7 +86,7 @@ export async function api<T>(path: string, { method = "GET", body, retry = true 
   }
 
   if (resp.status === 401 && retry && !path.startsWith("/auth/")) {
-    if (await refreshSession()) return api<T>(path, { method, body, retry: false });
+    if (await refreshSession()) return api<T>(path, { method, body, form, retry: false });
   }
   if (!resp.ok) throw new ApiError(await parseProblem(resp));
   if (resp.status === 204) return undefined as T;
@@ -95,6 +96,10 @@ export async function api<T>(path: string, { method = "GET", body, retry = true 
 export function errorText(err: unknown): string {
   if (err instanceof ApiError) {
     const p = err.problem;
+    const rows = p.rows as { row: number; message: string }[] | undefined;
+    if (rows?.length) {
+      return `${p.title}. ` + rows.map((r) => (r.row ? `Строка ${r.row}: ${r.message}` : r.message)).join(". ");
+    }
     if (p.errors?.length) return p.errors.map((e) => e.msg.replace(/^Value error, /, "")).join(". ");
     return p.detail ? `${p.title}. ${p.detail}` : p.title;
   }

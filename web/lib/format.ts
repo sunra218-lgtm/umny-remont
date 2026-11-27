@@ -63,3 +63,55 @@ export function describeDevice(ua: string | null): string {
             : "";
   return os ? `${browser}, ${os}` : browser;
 }
+
+export function rub(kop: number): string {
+  return (kop / 100).toLocaleString("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 2 });
+}
+
+/** «1 234,5» или «1234.50» → копейки; null, если не число. */
+export function parseRub(text: string): number | null {
+  const clean = text.replace(/[\s ₽]/g, "").replace(",", ".");
+  if (!/^\d+(\.\d{0,2})?$/.test(clean)) return null;
+  return Math.round(parseFloat(clean) * 100);
+}
+
+export const OBJECT_STATUS_LABELS: Record<string, string> = {
+  draft: "Новый",
+  survey: "Замер",
+  estimating: "Составление сметы",
+  contracting: "Подписание договора",
+  active: "Ремонт идёт",
+  dispute: "Спор",
+  completed: "Завершён",
+  cancelled: "Отменён",
+};
+
+export const OBJECT_STEPS = ["draft", "survey", "estimating", "contracting", "active", "completed"];
+
+export const SERVICE_TYPE_LABELS: Record<string, string> = { acceptance: "Умная приёмка", survey: "Замер" };
+
+export const SERVICE_STATUS_LABELS: Record<string, string> = {
+  created: "Ждёт назначения",
+  scheduled: "Назначен, ждёт оплаты",
+  paid: "Оплачен",
+  completed: "Выполнен",
+  cancelled: "Отменён",
+};
+
+export const ESTIMATE_TYPE_LABELS: Record<string, string> = { preliminary: "Предварительная", full: "Полная" };
+
+export const ESTIMATE_STATUS_LABELS: Record<string, string> = {
+  draft: "Черновик",
+  submitted: "Ждёт утверждения",
+  approved: "Утверждена",
+};
+
+export const ASSIGNMENT_LABELS: Record<string, string> = {
+  foreman: "Прораб",
+  inspector: "Инженер технадзора",
+  procurement_manager: "Менеджер снабжения",
+};
+
+export function personName(p: { full_name: string | null; phone: string }): string {
+  return p.full_name || formatPhone(p.phone);
+}

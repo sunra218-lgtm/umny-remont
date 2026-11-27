@@ -14,6 +14,7 @@ export function Header() {
       </Link>
       {me && (
         <nav className="topnav">
+          <Link href="/objects">Объекты</Link>
           <Link href="/cabinet">Кабинет</Link>
           {me.is_platform_admin && <Link href="/admin">Админка</Link>}
           <button type="button" className="link" onClick={() => void signOut().then(() => location.assign("/login"))}>

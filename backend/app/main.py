@@ -11,8 +11,12 @@ from app.core.problems import install_problem_handlers
 from app.core.redis import get_redis
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
+from app.modules.catalog.router import router as catalog_router
+from app.modules.estimates.router import router as estimates_router
 from app.modules.me.router import router as me_router
+from app.modules.objects.router import router as objects_router
 from app.modules.orgs.router import router as orgs_router
+from app.modules.services.router import router as services_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -43,6 +47,10 @@ def create_app() -> FastAPI:
     api.include_router(me_router)
     api.include_router(orgs_router)
     api.include_router(admin_router)
+    api.include_router(objects_router)
+    api.include_router(services_router)
+    api.include_router(estimates_router)
+    api.include_router(catalog_router)
 
     @api.get("/health", tags=["system"], summary="Проверка работоспособности")
     async def health() -> dict[str, str]:
