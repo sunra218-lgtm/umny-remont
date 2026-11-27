@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.cameras import Camera, CameraFrame
 from app.models.identity import (
     AuditLog,
     AuthLink,
@@ -37,6 +38,8 @@ from app.models.work import (
 )
 
 __all__ = [
+    "Camera",
+    "CameraFrame",
     "EngineerQuestion",
     "DailyPlan",
     "DailyPlanItem",

@@ -41,6 +41,7 @@ import type {
 } from "@/lib/types";
 
 import { ErrorNote, Loading, Shell } from "../../components";
+import { Cameras } from "../../cameras";
 import { DailyPlans } from "../../daily";
 import { BasketForm, OrderCard } from "../../orders";
 
@@ -97,6 +98,7 @@ export default function ObjectPage() {
         <div>
           <ObjectInfo obj={obj} onChanged={load} />
           <Team obj={obj} me={me} />
+          <Cameras obj={obj} />
         </div>
       </div>
     </Shell>

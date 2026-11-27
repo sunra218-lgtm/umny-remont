@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     media_link_ttl_s: int = 15 * 60
     max_photo_bytes: int = 2 * 1024 * 1024
 
+    # Камеры на объекте: сколько хранить кадры и сколько ждать снимок с IP-камеры.
+    camera_retention_days: int = 90
+    camera_fetch_timeout_s: float = 10.0
+
     # Антифрод фотоотчётов (ТЗ 2.3, раздел 6.2).
     capture_ttl_s: int = 10 * 60
     geo_max_distance_m: int = 300

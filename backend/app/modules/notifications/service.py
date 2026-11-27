@@ -43,6 +43,9 @@ TEMPLATES: dict[str, str] = {
     "day_returned": "Работы за {day} не приняты: {note}. {url}",
     "question_asked": "Вопрос бригады инженеру: {address}. Ответьте: {url}",
     "question_answered": "Инженер ответил на ваш вопрос: {url}",
+    "camera_added": (
+        "На объекте {address} подключили камеру. Она снимает, только если вы её включите: {url}"
+    ),
     "daily_reminder": "Пришлите фотоотчёт за сегодня по объекту {address}: {url}",
 }
 

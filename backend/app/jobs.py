@@ -3,12 +3,16 @@
 python -m app.jobs send       — отправить очередь СМС
 python -m app.jobs expire     — закрыть корзины, не подтверждённые за 24 часа
 python -m app.jobs reminders  — напомнить бригадам об отчёте за сегодня (обычно в 18:00)
-python -m app.jobs worker     — всё вместе: очередь раз в 5 секунд, напоминания в 18:00 МСК
+python -m app.jobs cameras    — забрать кадры с IP-камер
+python -m app.jobs purge      — удалить старые кадры камер
+python -m app.jobs worker     — всё вместе: очередь раз в 5 секунд, камеры раз в минуту,
+                                напоминания в 18:00 МСК, чистка кадров раз в час
 """
 
 import asyncio
 import logging
 import sys
+import time as time_
 from datetime import datetime, time
 
 from sqlalchemy import func, select
@@ -18,6 +22,7 @@ from app.core.db import get_session
 from app.core.security import utcnow
 from app.models import MediaReport, Notification, ObjectAssignment, RepairObject
 from app.models.enums import AssignmentRole, ObjectStatus
+from app.modules.cameras.service import capture_ip_cameras, purge_old_frames
 from app.modules.notifications import service as notes
 from app.modules.notifications.service import MSK
 from app.modules.procurement.router import expire_orders
@@ -81,12 +86,25 @@ async def _with_db(job):  # type: ignore[no-untyped-def]
 
 async def worker() -> None:
     log.warning("Фоновый процесс запущен")
+    last: dict[str, float] = {}
+
+    def every(name: str, seconds: int) -> bool:
+        now = time_.monotonic()
+        if now - last.get(name, -1e9) < seconds:
+            return False
+        last[name] = now
+        return True
+
     while True:
         try:
             await _with_db(notes.send_queued)
             await _with_db(expire_orders)
             if utcnow().astimezone(MSK).hour == REMINDER_HOUR:
                 await _with_db(daily_reminders)
+            if every("cameras", 60):
+                await _with_db(capture_ip_cameras)
+            if every("purge", 3600):
+                await _with_db(purge_old_frames)
         except Exception:
             log.exception("Ошибка фоновой задачи")
         await asyncio.sleep(5)
@@ -96,6 +114,8 @@ JOBS = {
     "send": notes.send_queued,
     "expire": expire_orders,
     "reminders": daily_reminders,
+    "cameras": capture_ip_cameras,
+    "purge": purge_old_frames,
 }
 
 

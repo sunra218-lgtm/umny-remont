@@ -881,3 +881,29 @@ audio {
   border: 1px solid var(--border);
   margin-top: var(--space);
 }
+
+/* Камеры */
+.break {
+  overflow-wrap: anywhere;
+}
+.timelapse img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius);
+}
+.timelapse input[type="range"] {
+  width: 100%;
+}
+.dim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  color: #555;
+  border: 0;
+  border-radius: 0;
+  font-size: 14px;
+}

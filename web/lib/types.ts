@@ -482,3 +482,58 @@ export type EngineerQuestion = {
   created_at: string;
   can_answer: boolean;
 };
+
+export type CameraState = "off" | "paused" | "sleeping" | "no_signal" | "live";
+
+export type Camera = {
+  id: string;
+  object_id: string;
+  title: string;
+  kind: "ip" | "phone";
+  snapshot_url: string | null;
+  interval_min: number;
+  hour_from: number;
+  hour_to: number;
+  enabled: boolean;
+  consent_at: string | null;
+  state: CameraState;
+  last_frame_at: string | null;
+  last_seen_at: string | null;
+  last_error: string | null;
+  latest_frame_url: string | null;
+  frames_today: number;
+  can_toggle: boolean;
+  can_edit: boolean;
+  phone_link: string | null;
+};
+
+export type CameraFrame = {
+  id: string;
+  taken_at: string;
+  url: string;
+  changed: boolean;
+  stage_id: string | null;
+  stage_title: string | null;
+  hidden_work: boolean;
+  labels: { note?: string; hidden_steps?: string[]; source?: string };
+  labeled_by: "auto" | "engineer";
+};
+
+export type CameraFrames = {
+  day: string;
+  days: { day: string; frames: number; changed: number }[];
+  frames: CameraFrame[];
+  can_label: boolean;
+};
+
+export type PhoneCameraStatus = {
+  title: string;
+  enabled: boolean;
+  state: CameraState;
+  message: string;
+  interval_min: number;
+  hour_from: number;
+  hour_to: number;
+  next_in_s: number;
+  frames_today: number;
+};

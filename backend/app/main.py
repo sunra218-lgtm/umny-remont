@@ -15,6 +15,7 @@ from app.modules.admin.kpi import router as kpi_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.links import router as links_router
 from app.modules.auth.router import router as auth_router
+from app.modules.cameras.router import router as cameras_router
 from app.modules.catalog.router import router as catalog_router
 from app.modules.checklists.router import router as checklists_router
 from app.modules.daily.router import router as daily_router
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
     api.include_router(techcards_router)
     api.include_router(daily_router)
     api.include_router(guide_router)
+    api.include_router(cameras_router)
     api.include_router(inspections_router)
     api.include_router(payments_router)
     api.include_router(acts_router)
