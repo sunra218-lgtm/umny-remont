@@ -103,6 +103,7 @@ function TaskCard({ task, onChanged }: { task: MarketTask; onChanged: () => Prom
   return (
     <>
       <b>{task.title}</b>
+      {task.lux && <span className="badge lux-badge">Люкс</span>}
       <div className="muted small">
         {task.area_hint}
         {task.area_m2 && ` · ${task.area_m2} м²`} · опубликована {formatDate(task.created_at)} · откликов {task.bids_count}

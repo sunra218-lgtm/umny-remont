@@ -49,6 +49,12 @@ TEMPLATES: dict[str, str] = {
     "market_task": "Новая заявка на ремонт: {area}. Откликнитесь: {url}",
     "market_bid": "Новый отклик на ваш ремонт ({address}): {price}. Сравните отклики: {url}",
     "market_won": "Заказчик выбрал вас: {address}. Объект: {url}",
+    "lux_requested": "Заказчик выбрал пакет «Люкс»: {address}. Назначьте менеджера: {url}",
+    "lux_manager": "Вы персональный менеджер объекта «Люкс»: {address}. {url}",
+    "furniture_requested": "Заказ мебели №{number} ({address}): подготовьте предложение {url}",
+    "furniture_quoted": "Предложение по мебели №{number}: {total}. Подтвердите: {url}",
+    "furniture_status": "Заказ мебели №{number}: {status}. {url}",
+    "furniture_confirmed": "Заказчик подтвердил заказ мебели №{number} на {total}. {url}",
     "market_lost": "Заказчик выбрал другого подрядчика по заявке «{title}». Другие заявки: {url}",
     "daily_reminder": "Пришлите фотоотчёт за сегодня по объекту {address}: {url}",
 }

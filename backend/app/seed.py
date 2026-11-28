@@ -183,7 +183,17 @@ async def seed_design() -> int:
     return 0
 
 
+async def seed_lux() -> int:
+    from app.modules.lux.service import seed_items
+
+    async for db in get_session():
+        return await seed_items(db)
+    return 0
+
+
 async def main() -> None:
+    added = await seed_lux()
+    print(f"Витрина мебели: добавлено {added}")  # noqa: T201
     added = await seed_design()
     print(f"Каталог отделки: добавлено {added}")  # noqa: T201
     added = await seed_cards()

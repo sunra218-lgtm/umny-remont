@@ -64,6 +64,7 @@ export default function ContractorPage() {
               />
             )}
           </section>
+          {me.is_platform_admin && c.verified && <VipToggle c={c} onChanged={load} />}
           <Portfolio c={c} onChanged={setC} />
           <section className="card">
             <h2>Отзывы заказчиков</h2>
@@ -226,6 +227,34 @@ function Portfolio({ c, onChanged }: { c: ContractorFull; onChanged: (c: Contrac
           <ErrorNote text={error} />
         </div>
       )}
+    </section>
+  );
+}
+
+/** Администратор отмечает VIP-подрядчиков: только они берут объекты «Люкс». */
+function VipToggle({ c, onChanged }: { c: ContractorFull; onChanged: () => Promise<void> }) {
+  const [error, setError] = useState<string | null>(null);
+  async function toggle() {
+    setError(null);
+    try {
+      await api(`/contractors/${c.org_id}/vip`, { method: "PUT", body: { vip: !c.vip } });
+      await onChanged();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+  return (
+    <section className="card">
+      <h2>VIP-мастера</h2>
+      <p className="muted small">
+        {c.vip
+          ? "Подрядчик в списке VIP: ему доступны объекты пакета «Люкс»."
+          : "Объекты пакета «Люкс» берут только VIP-подрядчики с лучшими оценками и портфолио."}
+      </p>
+      <ErrorNote text={error} />
+      <button type="button" className="secondary" onClick={() => void toggle()}>
+        {c.vip ? "Убрать из VIP" : "Сделать VIP"}
+      </button>
     </section>
   );
 }

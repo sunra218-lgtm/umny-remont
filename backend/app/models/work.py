@@ -64,6 +64,11 @@ class RepairObject(UUIDPk, Timestamps, SoftDelete, Base):
     match_mode: Mapped[str] = mapped_column(
         String(10), nullable=False, default="platform", server_default="platform"
     )
+    # Пакет: standard или lux — VIP-мастера, персональный менеджер, дизайнерская мебель.
+    package: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="standard", server_default="standard"
+    )
+    lux_manager_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
 
 class ObjectAssignment(UUIDPk, Base):

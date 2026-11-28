@@ -57,6 +57,7 @@ class ObjectOut(BaseModel):
     contractor_org_id: uuid.UUID | None
     contractor_name: str | None = None
     match_mode: str = "platform"
+    package: str = "standard"
     created_at: datetime
     access: dict[str, bool] = Field(default_factory=dict)
 
