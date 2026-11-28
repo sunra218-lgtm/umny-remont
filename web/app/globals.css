@@ -1151,3 +1151,49 @@ audio {
 .timeline li.logistics::before {
   background: #c9a55a;
 }
+/* ---------- Ремонт с душой и куратор ---------- */
+.soul-card {
+  border-color: #b98a6e;
+  box-shadow: inset 0 3px 0 #b98a6e;
+}
+.soul-badge {
+  background: #f3e6dc;
+  color: #7a4b2f;
+  margin-left: 6px;
+}
+.final-note {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f3e6dc;
+  color: #5c3a24;
+}
+.designer-note {
+  font-style: italic;
+  margin: var(--space) 0 6px;
+}
+.decor {
+  margin-top: var(--space);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.decor-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.signals .signal {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border-left: 3px solid var(--border);
+  padding-left: 8px;
+}
+.signal-alert {
+  border-left-color: #c0392b !important;
+}
+.signal-warn {
+  border-left-color: #d4a017 !important;
+}
+.signal-info {
+  border-left-color: #6b8fb3 !important;
+}

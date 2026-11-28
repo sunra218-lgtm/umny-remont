@@ -9,6 +9,7 @@ import { useRequireAuth } from "@/lib/auth";
 import { qty, rub } from "@/lib/format";
 
 import { ErrorNote, Loading, Shell } from "../../../components";
+import { RoomDecor, SoulPanel, type Decor, type Soul } from "../../../soul";
 import {
   RoomPreview,
   roughRub,
@@ -19,6 +20,11 @@ import {
   type DesignProject,
   type DesignRoom,
 } from "../../../design";
+
+/** В «Ремонте с душой» утверждённый дизайн открывается только через доработку у дизайнера. */
+function locked(p: DesignProject | null): DesignProject | null {
+  return p && p.soul && p.finalized_at ? { ...p, can_edit: false } : p;
+}
 
 const VIDEO_STATUS: Record<string, string> = {
   processing: "Ролик готовится — обычно это занимает несколько часов",
@@ -37,10 +43,18 @@ export default function DesignPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [decor, setDecor] = useState<Decor[]>([]);
+  const [soul, setSoul] = useState<Soul | null>(null);
+
   const apply = useCallback(
     async (p: DesignProject | null) => {
-      setProject(p);
+      setProject(locked(p));
       setEstimate(p ? await api<DesignEstimate>(`/objects/${id}/design/estimate`) : null);
+      if (p) {
+        const [d, s] = await Promise.all([api<Decor[]>(`/objects/${id}/design/decor`), api<Soul>(`/objects/${id}/soul`)]);
+        setDecor(d);
+        setSoul(s);
+      }
     },
     [id],
   );
@@ -71,7 +85,7 @@ export default function DesignPage() {
     if (!waiting) return;
     const t = setInterval(async () => {
       try {
-        setProject(await api<DesignProject | null>(`/objects/${id}/design`));
+        setProject(locked(await api<DesignProject | null>(`/objects/${id}/design`)));
       } catch {
         /* следующая попытка */
       }
@@ -113,6 +127,12 @@ export default function DesignPage() {
       />
       {project && (
         <>
+          <SoulPanel
+            objectId={id}
+            styles={Object.fromEntries(info.styles.map((s) => [s.key, s.title]))}
+            rooms={project.rooms.map((r) => ({ key: r.key, name: r.name }))}
+            onChanged={load}
+          />
           <PlanAndRooms
             info={info}
             project={project}
@@ -131,6 +151,9 @@ export default function DesignPage() {
             project={project}
             catalog={catalog}
             busy={busy}
+            decor={decor}
+            roomNotes={soul?.contract?.room_notes ?? {}}
+            onDecor={setDecor}
             onChoose={(room, slot, materialId) =>
               run(() =>
                 api<DesignProject>(`/objects/${id}/design/rooms/${room}/${slot}`, {
@@ -363,12 +386,18 @@ function Rooms({
   catalog,
   busy,
   onChoose,
+  decor,
+  roomNotes,
+  onDecor,
 }: {
   info: DesignInfo;
   project: DesignProject;
   catalog: DesignMaterial[];
   busy: boolean;
   onChoose: (room: string, slot: string, materialId: string | null) => void;
+  decor: Decor[];
+  roomNotes: Record<string, string>;
+  onDecor: (next: Decor[]) => void;
 }) {
   const byId = useMemo(() => {
     const m = new Map<string, DesignMaterial>();
@@ -439,6 +468,14 @@ function Rooms({
                   );
                 })}
               </dl>
+              <RoomDecor
+                objectId={project.object_id}
+                roomKey={room.key}
+                items={decor.filter((d) => d.room_key === room.key)}
+                canEdit={project.can_edit}
+                note={roomNotes[room.key]}
+                onChanged={onDecor}
+              />
             </article>
           );
         })}

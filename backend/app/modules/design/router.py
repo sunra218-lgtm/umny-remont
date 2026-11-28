@@ -34,7 +34,20 @@ MAX_PLAN_BYTES = 10 * 1024 * 1024
 
 
 def _can_edit(access: ObjectAccess) -> bool:
-    return access.is_customer or access.is_admin or access.is_platform_estimator
+    return (
+        access.is_customer or access.is_admin or access.is_platform_estimator or access.is_designer
+    )
+
+
+def _check_open(p: DesignProject, access: ObjectAccess) -> None:
+    """В «Ремонте с душой» утверждённый дизайн меняется только через доработку у дизайнера."""
+    if access.obj.soul and p.finalized_at is not None:
+        raise Problem(
+            409,
+            "design-final",
+            "Дизайн утверждён",
+            "Чтобы что-то поменять, попросите дизайнера доработать проект.",
+        )
 
 
 # ---------- справочники ----------
@@ -212,6 +225,8 @@ class ProjectOut(BaseModel):
     renders: list[RenderOut]
     video_status: str | None
     video_url: str | None
+    soul: bool = False
+    finalized_at: datetime | None = None
 
 
 async def _project(db: DbSession, object_id: uuid.UUID) -> DesignProject | None:
@@ -268,6 +283,8 @@ async def _out(
         ],
         video_status=p.video_status,
         video_url=p.video_url,
+        soul=access.obj.soul,
+        finalized_at=p.finalized_at,
     )
 
 
@@ -276,10 +293,11 @@ async def _editable(
 ) -> tuple[DesignProject, ObjectAccess]:
     access = await load_object(db, current, object_id, lock=True)
     if not _can_edit(access):
-        raise Problem(403, "forbidden", "Дизайн-проект ведёт заказчик")
+        raise Problem(403, "forbidden", "Дизайн-проект ведут заказчик и дизайнер")
     p = await _project(db, object_id)
     if p is None:
         raise Problem(404, "not-found", "Сначала выберите стиль")
+    _check_open(p, access)
     return p, access
 
 
@@ -311,8 +329,10 @@ async def put_style(
         raise Problem(422, "unknown-style", "Неизвестный стиль")
     access = await load_object(db, current, object_id, lock=True)
     if not _can_edit(access):
-        raise Problem(403, "forbidden", "Дизайн-проект ведёт заказчик")
+        raise Problem(403, "forbidden", "Дизайн-проект ведут заказчик и дизайнер")
     p = await _project(db, object_id)
+    if p is not None:
+        _check_open(p, access)
     created = p is None
     if p is None:
         rooms = service.suggest_rooms(

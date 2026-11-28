@@ -55,6 +55,11 @@ class ObjectAccess:
         return self.is_admin or self.is_procurement
 
     @property
+    def is_designer(self) -> bool:
+        """Дизайнер интерьера, который ведёт проект объекта («Ремонт с душой»)."""
+        return AssignmentRole.designer in self.assignment_roles
+
+    @property
     def is_crew(self) -> bool:
         return AssignmentRole.foreman in self.assignment_roles or (
             OrgRole.contractor_admin in self.contractor_roles

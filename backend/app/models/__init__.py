@@ -30,6 +30,13 @@ from app.models.money_flow import (
     PurchaseOrderItem,
     Signature,
 )
+from app.models.soul import (
+    CuratorSignal,
+    DesignDecor,
+    DesignerContract,
+    DesignerPhoto,
+    DesignerProfile,
+)
 from app.models.work import (
     CaptureChallenge,
     ChecklistItem,
@@ -50,6 +57,11 @@ __all__ = [
     "DesignMaterial",
     "DesignProject",
     "DesignRender",
+    "CuratorSignal",
+    "DesignDecor",
+    "DesignerContract",
+    "DesignerPhoto",
+    "DesignerProfile",
     "FurnitureEvent",
     "FurnitureItem",
     "FurnitureOrder",
