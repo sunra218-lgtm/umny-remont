@@ -33,6 +33,8 @@ from app.modules.orgs.router import router as orgs_router
 from app.modules.payments.router import router as payments_router
 from app.modules.procurement.router import router as procurement_router
 from app.modules.services.router import router as services_router
+from app.modules.soul.curator import router as curator_router
+from app.modules.soul.router import router as soul_router
 from app.modules.techcards.router import router as techcards_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -83,6 +85,8 @@ def create_app() -> FastAPI:
     api.include_router(market_router)
     api.include_router(design_router)
     api.include_router(lux_router)
+    api.include_router(soul_router)
+    api.include_router(curator_router)
     api.include_router(inspections_router)
     api.include_router(payments_router)
     api.include_router(acts_router)

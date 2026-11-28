@@ -36,6 +36,9 @@ class AssignmentRole(StrEnum):
     foreman = "foreman"
     inspector = "inspector"
     procurement_manager = "procurement_manager"
+    # «Ремонт с душой»: дизайнер интерьера и куратор проекта (человек).
+    designer = "designer"
+    curator = "curator"
 
 
 class SessionKind(StrEnum):

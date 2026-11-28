@@ -32,6 +32,7 @@ from app.domain.statuses import ensure_transition
 from app.models import (
     CameraFrame,
     Delivery,
+    DesignerPhoto,
     DesignProject,
     DesignRender,
     EngineerQuestion,
@@ -521,7 +522,9 @@ async def set_request_status(
     "/files/{kind}/{file_id}", summary="Файл по подписанной ссылке", response_class=Response
 )
 async def file_content(
-    kind: Literal["audio", "invoice", "question", "frame", "portfolio", "plan", "render"],
+    kind: Literal[
+        "audio", "invoice", "question", "frame", "portfolio", "plan", "render", "designer"
+    ],
     file_id: uuid.UUID,
     exp: int,
     v: uuid.UUID,
@@ -542,6 +545,9 @@ async def file_content(
     elif kind == "plan":
         dp = await db.get(DesignProject, file_id)
         key, content_type = (dp.plan_key, dp.plan_type) if dp else (None, None)
+    elif kind == "designer":
+        dph = await db.get(DesignerPhoto, file_id)
+        key, content_type = (dph.storage_key, dph.content_type) if dph else (None, None)
     elif kind == "render":
         rr = await db.get(DesignRender, file_id)
         key, content_type = (rr.storage_key, "image/jpeg") if rr else (None, None)

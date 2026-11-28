@@ -65,6 +65,8 @@ export type DesignProject = {
   renders: { room_key: string; status: string; url: string | null; error: string | null }[];
   video_status: string | null;
   video_url: string | null;
+  soul?: boolean;
+  finalized_at?: string | null;
 };
 
 export type DesignLine = {

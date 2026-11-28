@@ -68,6 +68,9 @@ class DesignProject(UUIDPk, Timestamps, Base):
     video_url: Mapped[str | None] = mapped_column(String(500))
     video_job_id: Mapped[str | None] = mapped_column(String(100))
     video_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Дизайн утверждён (в «Ремонте с душой» — после сдачи дизайнером и приёмки заказчиком).
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finalized_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
 
 class DesignRender(UUIDPk, Timestamps, Base):

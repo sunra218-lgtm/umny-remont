@@ -69,6 +69,15 @@ class RepairObject(UUIDPk, Timestamps, SoftDelete, Base):
         String(10), nullable=False, default="standard", server_default="standard"
     )
     lux_manager_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    # «Ремонт с душой»: финальное слово в дизайне за живым дизайнером.
+    soul: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    # Куратор проекта: ai — проверки платформы; human — ещё и человек (curator_id).
+    curator_kind: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="ai", server_default="ai"
+    )
+    curator_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
 
 class ObjectAssignment(UUIDPk, Base):

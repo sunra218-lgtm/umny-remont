@@ -8,6 +8,7 @@ python -m app.jobs purge      — удалить старые кадры кам�
 python -m app.jobs renders    — картинки комнат дизайн-проекта
 python -m app.jobs videos     — статус роликов контент-завода
 python -m app.jobs tracking   — отметки пути заказов мебели
+python -m app.jobs curator    — проверки ИИ-куратора по объектам
 python -m app.jobs worker     — всё вместе: очередь раз в 5 секунд, камеры раз в минуту,
                                 напоминания в 18:00 МСК, чистка кадров раз в час
 """
@@ -31,6 +32,7 @@ from app.modules.lux.jobs import poll_tracking
 from app.modules.notifications import service as notes
 from app.modules.notifications.service import MSK
 from app.modules.procurement.router import expire_orders
+from app.modules.soul.curator import run_checks
 
 log = logging.getLogger("umny.jobs")
 REMINDER_HOUR = 18
@@ -116,6 +118,8 @@ async def worker() -> None:
                 await _with_db(poll_videos)
             if every("tracking", 1800):
                 await _with_db(poll_tracking)
+            if every("curator", 3600):
+                await _with_db(run_checks)
         except Exception:
             log.exception("Ошибка фоновой задачи")
         await asyncio.sleep(5)
@@ -130,6 +134,7 @@ JOBS = {
     "renders": process_renders,
     "videos": poll_videos,
     "tracking": poll_tracking,
+    "curator": run_checks,
 }
 
 

@@ -301,6 +301,12 @@ async def add_assignment(
 ) -> AssignmentOut:
     access = await load_object(db, current, object_id)
     obj = access.obj
+    if body.role not in ASSIGNMENT_SOURCE:
+        raise Problem(
+            422,
+            "role-not-assignable",
+            "Дизайнера и куратора назначают в разделах «Дизайн-проект» и «Куратор»",
+        )
     org_type, member_role = ASSIGNMENT_SOURCE[body.role]
     if body.role == AssignmentRole.foreman:
         if not access.can_manage_team:
