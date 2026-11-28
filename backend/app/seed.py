@@ -175,7 +175,17 @@ async def seed_cards() -> int:
     return 0
 
 
+async def seed_design() -> int:
+    from app.modules.design.service import seed_materials
+
+    async for db in get_session():
+        return await seed_materials(db)
+    return 0
+
+
 async def main() -> None:
+    added = await seed_design()
+    print(f"Каталог отделки: добавлено {added}")  # noqa: T201
     added = await seed_cards()
     print(f"Техкарты: добавлено {added}")  # noqa: T201
     added = await seed_catalog()

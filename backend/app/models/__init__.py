@@ -1,5 +1,6 @@
 from app.models.base import Base
 from app.models.cameras import Camera, CameraFrame
+from app.models.design import DesignMaterial, DesignProject, DesignRender
 from app.models.identity import (
     AuditLog,
     AuthLink,
@@ -45,6 +46,9 @@ from app.models.work import (
 )
 
 __all__ = [
+    "DesignMaterial",
+    "DesignProject",
+    "DesignRender",
     "ContractorProfile",
     "ContractorReview",
     "MarketBid",

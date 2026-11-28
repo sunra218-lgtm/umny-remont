@@ -984,3 +984,96 @@ audio {
   object-fit: cover;
   border-radius: 6px;
 }
+/* ---------- дизайн-проект ---------- */
+.style-grid {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  margin-top: var(--space);
+}
+.style-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: calc(var(--space) * 1.5);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: inherit;
+  font-weight: 400;
+}
+.style-card[aria-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.palette {
+  display: flex;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.palette span {
+  flex: 1;
+}
+.rooms-table input,
+.rooms-table select {
+  min-width: 0;
+  width: 100%;
+}
+.rooms-table td {
+  min-width: 80px;
+}
+.design-rooms {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.design-room h3 {
+  margin-top: 0;
+}
+.room-preview,
+.room-render {
+  display: block;
+  width: 100%;
+  aspect-ratio: 400 / 230;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+.slots {
+  margin: var(--space) 0 0;
+  display: grid;
+  gap: 8px;
+}
+.slot dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.slot dd {
+  margin: 4px 0 0;
+}
+.slot select {
+  width: 100%;
+}
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.estimate-range {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.design-video {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  border-radius: 6px;
+}
